@@ -1507,9 +1507,44 @@ function createRowItems(rowData, rowLocationAttr, rowCategory) {
 
       Logger.log('✓ Created row item: ' + rowItemNumber + ' (GUID: ' + rowItemGuid + ')');
 
-      // Set Row Location attribute
-      client.setItemAttribute(rowItemGuid, rowLocationAttr.guid, positionNames);
-      Logger.log('Set Row Location attribute: ' + positionNames);
+      // Handle manual item numbering if needed
+      if (!rowItemNumber) {
+        Logger.log('⚠ Item number is null - category may not have auto-numbering enabled');
+
+        var numberPrompt = '========================================\n' +
+                           'ITEM NUMBER REQUIRED\n' +
+                           '========================================\n\n' +
+                           'The ROW category does not have auto-numbering enabled.\n' +
+                           'Please enter an item number for this row:\n\n' +
+                           'Row: ' + rowName + '\n' +
+                           'GUID: ' + rowItemGuid;
+
+        var numberResponse = ui.prompt('Enter Item Number', numberPrompt, ui.ButtonSet.OK_CANCEL);
+
+        if (numberResponse.getSelectedButton() !== ui.Button.OK) {
+          throw new Error('Item number is required but was not provided');
+        }
+
+        rowItemNumber = numberResponse.getResponseText().trim();
+        if (!rowItemNumber) {
+          throw new Error('Item number cannot be empty');
+        }
+
+        // Update the item with the user-provided number
+        Logger.log('Updating item with manual number: ' + rowItemNumber);
+        client.updateItem(rowItemGuid, { number: rowItemNumber });
+        Logger.log('✓ Item number set to: ' + rowItemNumber);
+      }
+
+      // Try to set Row Location attribute (may not be configured for this category)
+      try {
+        client.setItemAttribute(rowItemGuid, rowLocationAttr.guid, positionNames);
+        Logger.log('✓ Set Row Location attribute: ' + positionNames);
+      } catch (attrError) {
+        Logger.log('⚠ Warning: Could not set Row Location attribute: ' + attrError.message);
+        Logger.log('  This attribute may not be configured for the ROW category');
+        // Continue anyway - attribute is optional
+      }
 
       // Create BOM for row (add each rack with its quantity)
       var bomLines = [];
@@ -1605,6 +1640,35 @@ function createPODItem(rowItems, podCategory) {
     var podItemNumber = podItem.number || podItem.Number;
 
     Logger.log('Created POD item: ' + podItemNumber + ' (GUID: ' + podItemGuid + ')');
+
+    // Handle manual item numbering if needed
+    if (!podItemNumber) {
+      Logger.log('⚠ Item number is null - category may not have auto-numbering enabled');
+
+      var numberPrompt = '========================================\n' +
+                         'ITEM NUMBER REQUIRED\n' +
+                         '========================================\n\n' +
+                         'The POD category does not have auto-numbering enabled.\n' +
+                         'Please enter an item number for this POD:\n\n' +
+                         'POD: ' + podName + '\n' +
+                         'GUID: ' + podItemGuid;
+
+      var numberResponse = ui.prompt('Enter Item Number', numberPrompt, ui.ButtonSet.OK_CANCEL);
+
+      if (numberResponse.getSelectedButton() !== ui.Button.OK) {
+        throw new Error('Item number is required but was not provided');
+      }
+
+      podItemNumber = numberResponse.getResponseText().trim();
+      if (!podItemNumber) {
+        throw new Error('Item number cannot be empty');
+      }
+
+      // Update the item with the user-provided number
+      Logger.log('Updating POD item with manual number: ' + podItemNumber);
+      client.updateItem(podItemGuid, { number: podItemNumber });
+      Logger.log('✓ POD item number set to: ' + podItemNumber);
+    }
 
     // Create BOM for POD (add all rows with quantity 1)
     var bomLines = rowItems.map(function(row) {
