@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .header p {
+      margin: 10px 0 0 0;
+      opacity: 0.9;
+      font-size: 14px;
+    }
+
+    .tabs {
+      display: flex;
+      background: #fff;
+      border-bottom: 2px solid #e0e0e0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 15px 20px;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: none;
+      font-size: 14px;
+      font-weight: 500;
+      color: #666;
+      transition: all 0.3s ease;
+      border-bottom: 3px solid transparent;
+    }
+
+    .tab:hover {
+      background: #f9f9f9;
+      color: #333;
+    }
+
+    .tab.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+      background: #f9f9ff;
+    }
+
+    .tab-content {
+      display: none;
+      padding: 30px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      color: #333;
+      font-size: 24px;
+      margin-top: 0;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+
+    h3 {
+      color: #555;
+      font-size: 18px;
+      margin-top: 25px;
+      margin-bottom: 12px;
+    }
+
+    p {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 15px;
+    }
+
+    .step-box {
+      background: #f8f9ff;
+      border-left: 4px solid #667eea;
+      padding: 15px 20px;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+
+    .step-number {
+      display: inline-block;
+      background: #667eea;
+      color: white;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 30px;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+
+    .warning-box {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px 20px;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+
+    .warning-box strong {
+      color: #856404;
+    }
+
+    .tip-box {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
+      padding: 15px 20px;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+
+    .tip-box strong {
+      color: #155724;
+    }
+
+    ul {
+      color: #666;
+      line-height: 1.8;
+      margin-left: 20px;
+    }
+
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      color: #d63384;
+      font-size: 13px;
+    }
+
+    .menu-path {
+      background: #e3f2fd;
+      padding: 10px 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #1565c0;
+      margin: 10px 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+
+    .feature-card {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .feature-card h4 {
+      margin: 0 0 8px 0;
+      color: #667eea;
+      font-size: 16px;
+    }
+
+    .feature-card p {
+      margin: 0;
+      font-size: 13px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Arena Data Center - Help Guide</h1>
+      <p>Your friendly guide to managing data center configurations with Arena PLM</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab(0)">Getting Started</button>
+      <button class="tab" onclick="showTab(1)">Configuration</button>
+      <button class="tab" onclick="showTab(2)">Creating Content</button>
+      <button class="tab" onclick="showTab(3)">Publishing</button>
+    </div>
+
+    <!-- Tab 1: Getting Started -->
+    <div class="tab-content active">
+      <h2>Welcome! Let's Get You Started</h2>
+
+      <p>Welcome to Arena Data Center! This tool helps you design data center layouts, manage rack configurations, and sync everything with Arena PLM. Let's get you up and running!</p>
+
+      <h3>Step 1: Connect to Arena</h3>
+      <div class="step-box">
+        <span class="step-number">1</span>
+        <strong>Open the configuration menu</strong>
+        <div class="menu-path">Arena Data Center → Configuration → Configure Arena Connection</div>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">2</span>
+        <strong>Enter your Arena credentials</strong>
+        <ul>
+          <li><strong>Arena URL:</strong> Your Arena workspace URL (e.g., https://yourcompany.arenasolutions.com)</li>
+          <li><strong>Email:</strong> Your Arena login email</li>
+          <li><strong>Password:</strong> Your Arena password</li>
+          <li><strong>Workspace ID:</strong> Your Arena workspace ID (found in Arena settings)</li>
+        </ul>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">3</span>
+        <strong>Test the connection</strong>
+        <p>Click "Test Connection" from the main menu to verify everything is working correctly.</p>
+      </div>
+
+      <div class="tip-box">
+        <strong>Pro Tip:</strong> Your credentials are stored securely in Google's property service and are only accessible by this spreadsheet.
+      </div>
+
+      <h3>What This Tool Does</h3>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>Rack Management</h4>
+          <p>Create and configure rack BOMs with components from Arena</p>
+        </div>
+        <div class="feature-card">
+          <h4>Layout Design</h4>
+          <p>Design data center layouts with visual rack placement</p>
+        </div>
+        <div class="feature-card">
+          <h4>BOM Automation</h4>
+          <p>Automatically generate consolidated BOMs from your layouts</p>
+        </div>
+        <div class="feature-card">
+          <h4>Arena Sync</h4>
+          <p>Push POD/Row/Rack structures directly to Arena PLM</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Configuration -->
+    <div class="tab-content">
+      <h2>Configuration Setup</h2>
+
+      <p>Before you start creating racks and layouts, let's configure Arena and customize the tool to match your workflow.</p>
+
+      <h3>Required Setup in Arena</h3>
+      <div class="warning-box">
+        <strong>Important:</strong> You need to create a custom attribute in Arena before using the "Push POD Structure" feature.
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">1</span>
+        <strong>Create "Row Location" Custom Attribute</strong>
+        <ul>
+          <li>In Arena, go to Settings → Item Attributes</li>
+          <li>Create a new attribute named <code>Row Location</code></li>
+          <li>Type: <code>SINGLE_LINE_TEXT</code></li>
+          <li>This will store position information (e.g., "Pos 1, Pos 3, Pos 5")</li>
+        </ul>
+      </div>
+
+      <h3>Configure Category Colors</h3>
+      <p>Make your sheets more readable by assigning colors to Arena categories.</p>
+      <div class="menu-path">Arena Data Center → Configuration → Configure Category Colors</div>
+      <p>This helps you visually identify different component types at a glance!</p>
+
+      <h3>Configure Rack Colors</h3>
+      <p>Assign colors to different rack types in your overview layouts.</p>
+      <div class="menu-path">Arena Data Center → Configuration → Configure Rack Colors</div>
+      <p>Makes it easy to see which racks are which in your data center layout.</p>
+
+      <h3>Configure BOM Levels</h3>
+      <p>Set up which categories appear at which BOM levels (hierarchy).</p>
+      <div class="menu-path">Arena Data Center → Configuration → Configure BOM Levels</div>
+      <p>This determines how items are organized in consolidated BOMs.</p>
+
+      <h3>Configure Item Columns</h3>
+      <p>Choose which Arena attributes to display as columns in your rack configurations.</p>
+      <div class="menu-path">Arena Data Center → Configuration → Configure Item Columns</div>
+      <p>Customize what information you see for each component.</p>
+
+      <div class="tip-box">
+        <strong>Pro Tip:</strong> Start with category colors and rack colors first - they make the biggest visual impact!
+      </div>
+    </div>
+
+    <!-- Tab 3: Creating Content -->
+    <div class="tab-content">
+      <h2>Creating Racks and Layouts</h2>
+
+      <p>Now for the fun part! Let's build some rack configurations and design your data center layout.</p>
+
+      <h3>Option A: Use Existing Racks from Arena</h3>
+      <div class="step-box">
+        <span class="step-number">1</span>
+        <strong>Open Rack Picker</strong>
+        <div class="menu-path">Arena Data Center → Show Rack Picker</div>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">2</span>
+        <strong>Browse and filter racks</strong>
+        <p>Use category filters, search, and favorites to find the rack you want.</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">3</span>
+        <strong>Select a rack</strong>
+        <p>Click on a rack card to select it, then click a cell in your overview to place it.</p>
+      </div>
+
+      <h3>Option B: Create Custom Rack Configurations</h3>
+      <div class="step-box">
+        <span class="step-number">1</span>
+        <strong>Create new rack configuration</strong>
+        <div class="menu-path">Arena Data Center → Create Layout → New Rack Configuration</div>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">2</span>
+        <strong>Name your rack</strong>
+        <p>You can link to an existing Arena item or create a placeholder for later.</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">3</span>
+        <strong>Add components using Item Picker</strong>
+        <div class="menu-path">Arena Data Center → Show Item Picker</div>
+        <p>Browse Arena items, select components, and click rows to add them to your rack BOM.</p>
+      </div>
+
+      <div class="tip-box">
+        <strong>Tip:</strong> Use favorites in Item Picker to quickly access your most-used categories and components!
+      </div>
+
+      <h3>Creating an Overview Layout</h3>
+      <div class="step-box">
+        <span class="step-number">1</span>
+        <strong>Create new overview layout</strong>
+        <div class="menu-path">Arena Data Center → Create Layout → New Overview Layout</div>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">2</span>
+        <strong>Specify dimensions</strong>
+        <p>Set the number of rows and positions (columns) for your data center layout.</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">3</span>
+        <strong>Place racks in the grid</strong>
+        <p>Use Rack Picker to select and place racks in your layout positions.</p>
+      </div>
+
+      <h3>Generate Consolidated BOM</h3>
+      <p>Once your layout is complete, generate a consolidated BOM to see all materials:</p>
+      <div class="menu-path">Arena Data Center → BOM Operations → Create Consolidated BOM</div>
+      <p>This creates a new sheet showing all components with aggregated quantities across all racks!</p>
+    </div>
+
+    <!-- Tab 4: Publishing -->
+    <div class="tab-content">
+      <h2>Publishing to Arena</h2>
+
+      <p>Ready to push your data center design to Arena? The "Push POD Structure" feature creates a complete hierarchy in Arena.</p>
+
+      <h3>Understanding the POD Structure</h3>
+      <p>The system creates a three-level hierarchy in Arena:</p>
+      <ul>
+        <li><strong>POD (Point of Delivery):</strong> The top-level item representing your entire data center or section</li>
+        <li><strong>Row Items:</strong> One for each row in your overview, with Row Location attribute tracking positions</li>
+        <li><strong>Rack Items:</strong> Individual racks with their component BOMs</li>
+      </ul>
+
+      <h3>The Publishing Workflow</h3>
+      <div class="step-box">
+        <span class="step-number">1</span>
+        <strong>Start the publish process</strong>
+        <div class="menu-path">Arena Data Center → BOM Operations → Push POD Structure to Arena</div>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">2</span>
+        <strong>Validation check</strong>
+        <p>The system verifies that the "Row Location" custom attribute exists in Arena.</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">3</span>
+        <strong>Custom rack creation (if needed)</strong>
+        <p>If you have custom racks not yet in Arena, you'll be prompted to:</p>
+        <ul>
+          <li>Name the rack</li>
+          <li>Select a category</li>
+          <li>Add a description</li>
+        </ul>
+        <p>The system will create the Arena item and populate its BOM automatically!</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">4</span>
+        <strong>Choose: Update or Create New</strong>
+        <p>Decide whether to update existing POD/Row items or create fresh ones.</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">5</span>
+        <strong>Name your Row items</strong>
+        <p>You'll be prompted to name each row (e.g., "North Row A", "Row 1", etc.)</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">6</span>
+        <strong>Name your POD item</strong>
+        <p>Finally, name your POD (e.g., "Data Center Pod A", "West Wing POD")</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-number">7</span>
+        <strong>Success!</strong>
+        <p>Your overview sheet is updated with:</p>
+        <ul>
+          <li>POD information at the top with Arena link</li>
+          <li>Row Item column with links to each row in Arena</li>
+          <li>Direct links to view everything in Arena PLM</li>
+        </ul>
+      </div>
+
+      <h3>What Gets Created in Arena</h3>
+      <ul>
+        <li><strong>Custom Rack Items:</strong> Created with full BOMs from your configurations</li>
+        <li><strong>Row Items:</strong> Each with "Row Location" attribute (e.g., "Pos 1, Pos 3, Pos 5") and BOM showing all racks with correct quantities</li>
+        <li><strong>POD Item:</strong> Top-level assembly containing all rows</li>
+      </ul>
+
+      <div class="warning-box">
+        <strong>Note:</strong> The system creates Arena items in the correct order:
+        <ol>
+          <li>Custom racks first (so they exist for row BOMs)</li>
+          <li>Then row items (so they exist for POD BOM)</li>
+          <li>Finally the POD item at the top</li>
+        </ol>
+      </div>
+
+      <div class="tip-box">
+        <strong>Pro Tip:</strong> After publishing, click the Arena links in your overview sheet to jump directly to those items in Arena PLM!
+      </div>
+
+      <h3>Need Help?</h3>
+      <p>If you run into any issues:</p>
+      <ul>
+        <li>Check that your Arena connection is working (Test Connection menu)</li>
+        <li>Verify the "Row Location" attribute exists in Arena</li>
+        <li>Make sure all rack configurations have valid items</li>
+        <li>Check the Apps Script logs for detailed error messages</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    function showTab(index) {
+      // Hide all tabs and content
+      var tabs = document.getElementsByClassName('tab');
+      var contents = document.getElementsByClassName('tab-content');
+
+      for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove('active');
+        contents[i].classList.remove('active');
+      }
+
+      // Show selected tab and content
+      tabs[index].classList.add('active');
+      contents[index].classList.add('active');
+    }
+  </script>
+</body>
+</html>

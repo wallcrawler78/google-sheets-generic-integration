@@ -210,6 +210,28 @@ ArenaAPIClient.prototype.updateItem = function(itemId, itemData) {
 };
 
 /**
+ * Sets a custom attribute value on an item in Arena
+ * @param {string} itemId - The item identifier (GUID)
+ * @param {string} attributeGuid - The attribute GUID
+ * @param {string} value - The value to set
+ * @return {Object} Updated item data
+ */
+ArenaAPIClient.prototype.setItemAttribute = function(itemId, attributeGuid, value) {
+  var endpoint = '/items/' + encodeURIComponent(itemId);
+  return this.makeRequest(endpoint, {
+    method: 'PUT',
+    payload: {
+      attributes: [
+        {
+          guid: attributeGuid,
+          value: value
+        }
+      ]
+    }
+  });
+};
+
+/**
  * Gets workspace information
  * @return {Object} Workspace data
  */

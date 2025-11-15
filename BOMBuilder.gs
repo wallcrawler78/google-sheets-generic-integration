@@ -1056,3 +1056,730 @@ function readBOMFromSheet(sheet) {
   Logger.log('Read ' + bomLines.length + ' BOM lines from sheet');
   return bomLines;
 }
+
+/**
+ * Validates that the "Row Location" custom attribute exists in Arena
+ * @return {Object} Validation result with success status and attribute info
+ */
+function validateRowLocationAttribute() {
+  try {
+    var attributes = getArenaAttributes();
+    var rowLocationAttr = null;
+
+    // Look for "Row Location" attribute (case-insensitive)
+    for (var i = 0; i < attributes.length; i++) {
+      var attr = attributes[i];
+      var name = (attr.name || '').toLowerCase();
+      var apiName = (attr.apiName || '').toLowerCase();
+
+      if (name === 'row location' || apiName === 'row location' || apiName === 'rowlocation') {
+        rowLocationAttr = attr;
+        break;
+      }
+    }
+
+    if (!rowLocationAttr) {
+      return {
+        success: false,
+        message: 'Row Location custom attribute not found in Arena.\n\n' +
+                 'Please create a custom attribute named "Row Location" ' +
+                 '(type: SINGLE_LINE_TEXT) in Arena before using this feature.'
+      };
+    }
+
+    return {
+      success: true,
+      attribute: rowLocationAttr
+    };
+
+  } catch (error) {
+    Logger.log('Error validating Row Location attribute: ' + error.message);
+    return {
+      success: false,
+      message: 'Error checking Arena attributes: ' + error.message
+    };
+  }
+}
+
+/**
+ * Identifies custom racks that need Arena items created
+ * @param {Array} rackItemNumbers - Array of rack item numbers from overview
+ * @return {Array} Array of custom rack objects {itemNumber, metadata, sheet}
+ */
+function identifyCustomRacks(rackItemNumbers) {
+  var client = new ArenaAPIClient();
+  var customRacks = [];
+
+  rackItemNumbers.forEach(function(itemNumber) {
+    try {
+      // Find the rack config tab
+      var rackSheet = findRackConfigTab(itemNumber);
+      if (!rackSheet) {
+        Logger.log('No rack config found for: ' + itemNumber);
+        return;
+      }
+
+      var metadata = getRackConfigMetadata(rackSheet);
+
+      // Check if item exists in Arena
+      var arenaItem = client.getItemByNumber(itemNumber);
+
+      if (!arenaItem) {
+        // Item doesn't exist in Arena - it's a custom rack
+        Logger.log('Custom rack identified (not in Arena): ' + itemNumber);
+        customRacks.push({
+          itemNumber: itemNumber,
+          metadata: metadata,
+          sheet: rackSheet,
+          reason: 'not_in_arena'
+        });
+        return;
+      }
+
+      // Item exists - check if it has a BOM
+      var itemGuid = arenaItem.guid || arenaItem.Guid;
+      var bomData = client.makeRequest('/items/' + itemGuid + '/bom', { method: 'GET' });
+      var bomLines = bomData.results || bomData.Results || [];
+
+      if (bomLines.length === 0) {
+        // Item exists but has no BOM - it's a custom rack
+        Logger.log('Custom rack identified (no BOM): ' + itemNumber);
+        customRacks.push({
+          itemNumber: itemNumber,
+          metadata: metadata,
+          sheet: rackSheet,
+          arenaItem: arenaItem,
+          reason: 'no_bom'
+        });
+      }
+
+    } catch (error) {
+      Logger.log('Error checking rack ' + itemNumber + ': ' + error.message);
+      // If we can't check, assume it's custom to be safe
+      var rackSheet = findRackConfigTab(itemNumber);
+      if (rackSheet) {
+        customRacks.push({
+          itemNumber: itemNumber,
+          metadata: getRackConfigMetadata(rackSheet),
+          sheet: rackSheet,
+          reason: 'error_checking'
+        });
+      }
+    }
+  });
+
+  return customRacks;
+}
+
+/**
+ * Creates Arena items for custom racks with user prompts
+ * @param {Array} customRacks - Array of custom rack objects
+ * @return {Object} Result with created items
+ */
+function createCustomRackItems(customRacks) {
+  if (customRacks.length === 0) {
+    return { success: true, createdItems: [] };
+  }
+
+  var ui = SpreadsheetApp.getUi();
+  var client = new ArenaAPIClient();
+  var createdItems = [];
+
+  for (var i = 0; i < customRacks.length; i++) {
+    var rack = customRacks[i];
+
+    // Check if Arena item exists but just needs BOM
+    if (rack.arenaItem && rack.reason === 'no_bom') {
+      Logger.log('Rack exists in Arena, will add BOM: ' + rack.itemNumber);
+
+      // Get rack children and push BOM
+      var children = getRackConfigChildren(rack.sheet);
+      var itemGuid = rack.arenaItem.guid || rack.arenaItem.Guid;
+
+      // Convert children to BOM format
+      var bomLines = children.map(function(child, index) {
+        return {
+          itemNumber: child.itemNumber,
+          quantity: child.quantity || 1,
+          level: 0
+        };
+      });
+
+      syncBOMToArena(client, itemGuid, bomLines);
+
+      createdItems.push({
+        itemNumber: rack.itemNumber,
+        guid: itemGuid,
+        updated: true
+      });
+
+      continue;
+    }
+
+    // Prompt user for rack details
+    var promptMsg = '========================================\n' +
+                    'CREATING CUSTOM RACK ITEM ' + (i + 1) + ' of ' + customRacks.length + '\n' +
+                    '========================================\n\n' +
+                    'Rack Item Number: ' + rack.itemNumber + '\n' +
+                    'Current Name: ' + (rack.metadata.itemName || 'Not set') + '\n\n' +
+                    '----------------------------------------\n' +
+                    'Enter a name for this rack in Arena:';
+
+    var nameResponse = ui.prompt('Create Custom Rack (' + (i + 1) + ' of ' + customRacks.length + ')', promptMsg, ui.ButtonSet.OK_CANCEL);
+
+    if (nameResponse.getSelectedButton() !== ui.Button.OK) {
+      ui.alert('Error', 'Custom rack creation cancelled. Cannot proceed with POD creation.', ui.ButtonSet.OK);
+      return { success: false, message: 'Cancelled by user' };
+    }
+
+    var rackName = nameResponse.getResponseText().trim();
+    if (!rackName) {
+      ui.alert('Error', 'Rack name is required.', ui.ButtonSet.OK);
+      return { success: false, message: 'Invalid rack name' };
+    }
+
+    // Prompt for category (get favorite categories)
+    var categories = getArenaCategories();
+    var favoriteCategories = getFavoriteCategories();
+    var categoryList = favoriteCategories.length > 0 ? favoriteCategories : categories.slice(0, 10);
+
+    var categoryPrompt = 'RACK: ' + rack.itemNumber + ' - Select Category\n\n' +
+                         'Available categories:\n';
+    categoryList.forEach(function(cat, idx) {
+      categoryPrompt += '  ' + (idx + 1) + '. ' + cat + '\n';
+    });
+    categoryPrompt += '\n----------------------------------------\n';
+    categoryPrompt += 'Enter category number or name:';
+
+    var categoryResponse = ui.prompt('Select Category for Rack ' + rack.itemNumber, categoryPrompt, ui.ButtonSet.OK_CANCEL);
+
+    if (categoryResponse.getSelectedButton() !== ui.Button.OK) {
+      return { success: false, message: 'Cancelled by user' };
+    }
+
+    var categoryInput = categoryResponse.getResponseText().trim();
+    var selectedCategory = '';
+
+    // Check if input is a number (index)
+    var catIndex = parseInt(categoryInput, 10);
+    if (!isNaN(catIndex) && catIndex > 0 && catIndex <= categoryList.length) {
+      selectedCategory = categoryList[catIndex - 1];
+    } else {
+      selectedCategory = categoryInput;
+    }
+
+    // Prompt for description
+    var descResponse = ui.prompt(
+      'Description for Rack ' + rack.itemNumber,
+      'RACK: ' + rack.itemNumber + '\n\n' +
+      'Enter a description for this rack in Arena:',
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (descResponse.getSelectedButton() !== ui.Button.OK) {
+      return { success: false, message: 'Cancelled by user' };
+    }
+
+    var description = descResponse.getResponseText().trim();
+
+    // Create the item in Arena
+    try {
+      var newItem = client.createItem({
+        number: rack.itemNumber,
+        name: rackName,
+        category: selectedCategory,
+        description: description
+      });
+
+      var newItemGuid = newItem.guid || newItem.Guid;
+      Logger.log('Created rack item in Arena: ' + rack.itemNumber + ' (GUID: ' + newItemGuid + ')');
+
+      // Get rack children and push BOM
+      var children = getRackConfigChildren(rack.sheet);
+
+      var bomLines = children.map(function(child) {
+        return {
+          itemNumber: child.itemNumber,
+          quantity: child.quantity || 1,
+          level: 0
+        };
+      });
+
+      syncBOMToArena(client, newItemGuid, bomLines);
+
+      // Update rack config metadata with Arena info
+      rack.sheet.getRange(1, 2).setValue(rack.itemNumber);
+      rack.sheet.getRange(1, 3).setValue(rackName);
+      rack.sheet.getRange(1, 4).setValue(description);
+
+      createdItems.push({
+        itemNumber: rack.itemNumber,
+        guid: newItemGuid,
+        name: rackName,
+        created: true
+      });
+
+    } catch (error) {
+      Logger.log('Error creating rack item: ' + error.message);
+      ui.alert('Error', 'Failed to create rack item: ' + error.message, ui.ButtonSet.OK);
+      return { success: false, message: error.message };
+    }
+  }
+
+  return {
+    success: true,
+    createdItems: createdItems
+  };
+}
+
+/**
+ * Scans overview sheet row by row for rack placements
+ * @param {Sheet} sheet - Overview sheet
+ * @return {Array} Array of row objects {rowNumber, positions: [{col, itemNumber, rackCount}]}
+ */
+function scanOverviewByRow(sheet) {
+  var data = sheet.getDataRange().getValues();
+  var rowData = [];
+
+  // Find header row (contains "Pos 1", "Pos 2", etc.)
+  var headerRow = -1;
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    for (var j = 0; j < row.length; j++) {
+      if (row[j] && row[j].toString().toLowerCase().indexOf('pos') === 0) {
+        headerRow = i;
+        break;
+      }
+    }
+    if (headerRow !== -1) break;
+  }
+
+  if (headerRow === -1) {
+    throw new Error('Could not find position headers in overview sheet');
+  }
+
+  var headers = data[headerRow];
+  var firstPosCol = -1;
+
+  // Find first position column
+  for (var j = 0; j < headers.length; j++) {
+    if (headers[j] && headers[j].toString().toLowerCase().indexOf('pos') === 0) {
+      firstPosCol = j;
+      break;
+    }
+  }
+
+  // Scan each row after headers
+  for (var i = headerRow + 1; i < data.length; i++) {
+    var row = data[i];
+    var positions = [];
+    var rowHasData = false;
+
+    // Scan position columns
+    for (var j = firstPosCol; j < row.length; j++) {
+      var cellValue = row[j];
+
+      if (!cellValue) continue;
+
+      // Check if it's a rack (try to find config tab)
+      var rackSheet = findRackConfigTab(cellValue.toString());
+      if (rackSheet) {
+        rowHasData = true;
+        positions.push({
+          col: j,
+          positionName: headers[j],
+          itemNumber: cellValue.toString()
+        });
+      }
+    }
+
+    if (rowHasData) {
+      // Get row number from first column
+      var rowNumber = row[0] || (rowData.length + 1);
+
+      rowData.push({
+        rowNumber: rowNumber,
+        sheetRow: i + 1, // Sheet row index (1-based)
+        positions: positions
+      });
+    }
+  }
+
+  Logger.log('Scanned overview: found ' + rowData.length + ' rows with racks');
+  return rowData;
+}
+
+/**
+ * Creates Row items in Arena with Row Location attribute
+ * @param {Array} rowData - Array of row objects from scanOverviewByRow
+ * @param {Object} rowLocationAttr - Row Location attribute metadata
+ * @return {Array} Array of created row items with metadata
+ */
+function createRowItems(rowData, rowLocationAttr) {
+  var ui = SpreadsheetApp.getUi();
+  var client = new ArenaAPIClient();
+  var rowItems = [];
+
+  for (var i = 0; i < rowData.length; i++) {
+    var row = rowData[i];
+
+    // Prompt user for row name
+    var promptMsg = '========================================\n' +
+                    'CREATING ROW ITEM ' + (i + 1) + ' of ' + rowData.length + '\n' +
+                    '========================================\n\n' +
+                    'Overview Row Number: ' + row.rowNumber + '\n\n' +
+                    'This row contains racks in the following positions:\n';
+
+    row.positions.forEach(function(pos) {
+      promptMsg += '  • ' + pos.positionName + ': ' + pos.itemNumber + '\n';
+    });
+
+    promptMsg += '\n----------------------------------------\n';
+    promptMsg += 'Enter a name for this Row item in Arena:';
+
+    var nameResponse = ui.prompt('Create Row Item (' + (i + 1) + ' of ' + rowData.length + ')', promptMsg, ui.ButtonSet.OK_CANCEL);
+
+    if (nameResponse.getSelectedButton() !== ui.Button.OK) {
+      ui.alert('Error', 'Row creation cancelled.', ui.ButtonSet.OK);
+      return null;
+    }
+
+    var rowName = nameResponse.getResponseText().trim();
+    if (!rowName) {
+      rowName = 'Row ' + row.rowNumber;
+    }
+
+    // Build Row Location value (comma-separated position names)
+    var positionNames = row.positions.map(function(pos) {
+      return pos.positionName;
+    }).join(', ');
+
+    // Aggregate rack quantities for this row
+    var rackCounts = {};
+    row.positions.forEach(function(pos) {
+      if (!rackCounts[pos.itemNumber]) {
+        rackCounts[pos.itemNumber] = 0;
+      }
+      rackCounts[pos.itemNumber]++;
+    });
+
+    // Create row item in Arena
+    try {
+      var rowItem = client.createItem({
+        name: rowName,
+        category: 'Row', // Or prompt user for category
+        description: 'Row ' + row.rowNumber + ' with racks in positions: ' + positionNames
+      });
+
+      var rowItemGuid = rowItem.guid || rowItem.Guid;
+      var rowItemNumber = rowItem.number || rowItem.Number;
+
+      Logger.log('Created row item: ' + rowItemNumber + ' (GUID: ' + rowItemGuid + ')');
+
+      // Set Row Location attribute
+      client.setItemAttribute(rowItemGuid, rowLocationAttr.guid, positionNames);
+      Logger.log('Set Row Location attribute: ' + positionNames);
+
+      // Create BOM for row (add each rack with its quantity)
+      var bomLines = [];
+      for (var rackNumber in rackCounts) {
+        bomLines.push({
+          itemNumber: rackNumber,
+          quantity: rackCounts[rackNumber],
+          level: 0
+        });
+      }
+
+      syncBOMToArena(client, rowItemGuid, bomLines);
+      Logger.log('Added ' + bomLines.length + ' racks to row BOM');
+
+      rowItems.push({
+        rowNumber: row.rowNumber,
+        sheetRow: row.sheetRow,
+        itemNumber: rowItemNumber,
+        guid: rowItemGuid,
+        name: rowName,
+        positions: positionNames
+      });
+
+    } catch (error) {
+      Logger.log('Error creating row item: ' + error.message);
+      ui.alert('Error', 'Failed to create row item: ' + error.message, ui.ButtonSet.OK);
+      return null;
+    }
+  }
+
+  return rowItems;
+}
+
+/**
+ * Creates POD item in Arena with all rows as BOM
+ * @param {Array} rowItems - Array of row item objects
+ * @return {Object} Created POD item metadata
+ */
+function createPODItem(rowItems) {
+  var ui = SpreadsheetApp.getUi();
+  var client = new ArenaAPIClient();
+
+  // Prompt user for POD name
+  var promptMsg = '========================================\n' +
+                  'CREATING POD ITEM (Top-Level Assembly)\n' +
+                  '========================================\n\n' +
+                  'This POD will contain ' + rowItems.length + ' Row item(s) in its BOM:\n\n';
+
+  rowItems.forEach(function(row, index) {
+    promptMsg += '  ' + (index + 1) + '. ' + row.name + ' (' + row.itemNumber + ')\n';
+  });
+
+  promptMsg += '\n----------------------------------------\n';
+  promptMsg += 'Enter a name for this POD item in Arena:\n';
+  promptMsg += '(e.g., "Data Center Pod A", "West Wing POD")';
+
+  var nameResponse = ui.prompt('Create POD Item', promptMsg, ui.ButtonSet.OK_CANCEL);
+
+  if (nameResponse.getSelectedButton() !== ui.Button.OK) {
+    ui.alert('Error', 'POD creation cancelled.', ui.ButtonSet.OK);
+    return null;
+  }
+
+  var podName = nameResponse.getResponseText().trim();
+  if (!podName) {
+    ui.alert('Error', 'POD name is required.', ui.ButtonSet.OK);
+    return null;
+  }
+
+  try {
+    // Create POD item in Arena
+    var podItem = client.createItem({
+      name: podName,
+      category: 'POD', // Or prompt user for category
+      description: 'Point of Delivery containing ' + rowItems.length + ' rows'
+    });
+
+    var podItemGuid = podItem.guid || podItem.Guid;
+    var podItemNumber = podItem.number || podItem.Number;
+
+    Logger.log('Created POD item: ' + podItemNumber + ' (GUID: ' + podItemGuid + ')');
+
+    // Create BOM for POD (add all rows with quantity 1)
+    var bomLines = rowItems.map(function(row) {
+      return {
+        itemNumber: row.itemNumber,
+        quantity: 1,
+        level: 0
+      };
+    });
+
+    syncBOMToArena(client, podItemGuid, bomLines);
+    Logger.log('Added ' + bomLines.length + ' rows to POD BOM');
+
+    return {
+      itemNumber: podItemNumber,
+      guid: podItemGuid,
+      name: podName
+    };
+
+  } catch (error) {
+    Logger.log('Error creating POD item: ' + error.message);
+    ui.alert('Error', 'Failed to create POD item: ' + error.message, ui.ButtonSet.OK);
+    return null;
+  }
+}
+
+/**
+ * Main function to push POD structure to Arena
+ * Creates POD -> Rows -> Racks hierarchy in Arena
+ */
+function pushPODStructureToArena() {
+  var ui = SpreadsheetApp.getUi();
+
+  try {
+    // Find overview sheet
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheets = ss.getSheets();
+    var overviewSheet = null;
+
+    for (var i = 0; i < sheets.length; i++) {
+      if (sheets[i].getName().toLowerCase().indexOf('overview') !== -1) {
+        overviewSheet = sheets[i];
+        break;
+      }
+    }
+
+    if (!overviewSheet) {
+      ui.alert('Error', 'Overview sheet not found.', ui.ButtonSet.OK);
+      return;
+    }
+
+    // Step 1: Validate Row Location attribute exists
+    ui.alert('Validation', 'Validating Arena configuration...', ui.ButtonSet.OK);
+    var validation = validateRowLocationAttribute();
+
+    if (!validation.success) {
+      ui.alert('Validation Failed', validation.message, ui.ButtonSet.OK);
+      return;
+    }
+
+    var rowLocationAttr = validation.attribute;
+    Logger.log('Row Location attribute found: ' + rowLocationAttr.guid);
+
+    // Step 2: Scan overview for racks
+    var overviewData = scanOverviewByRow(overviewSheet);
+
+    if (overviewData.length === 0) {
+      ui.alert('Error', 'No racks found in overview sheet.', ui.ButtonSet.OK);
+      return;
+    }
+
+    // Get unique rack item numbers
+    var allRackNumbers = [];
+    overviewData.forEach(function(row) {
+      row.positions.forEach(function(pos) {
+        if (allRackNumbers.indexOf(pos.itemNumber) === -1) {
+          allRackNumbers.push(pos.itemNumber);
+        }
+      });
+    });
+
+    Logger.log('Found ' + allRackNumbers.length + ' unique racks in overview');
+
+    // Step 3: Identify custom racks
+    ui.alert('Checking Racks', 'Checking which racks need to be created in Arena...', ui.ButtonSet.OK);
+    var customRacks = identifyCustomRacks(allRackNumbers);
+
+    // Step 4: Create custom rack items (if any)
+    if (customRacks.length > 0) {
+      var msg = 'Found ' + customRacks.length + ' custom rack(s) that need Arena items:\n\n';
+      customRacks.forEach(function(rack) {
+        msg += '  - ' + rack.itemNumber + '\n';
+      });
+      msg += '\nWould you like to create these now?';
+
+      var response = ui.alert('Custom Racks Found', msg, ui.ButtonSet.YES_NO);
+
+      if (response === ui.Button.NO) {
+        ui.alert('Cancelled', 'POD creation cancelled. Please create rack items first.', ui.ButtonSet.OK);
+        return;
+      }
+
+      var rackResult = createCustomRackItems(customRacks);
+
+      if (!rackResult.success) {
+        ui.alert('Error', 'Failed to create custom racks: ' + rackResult.message, ui.ButtonSet.OK);
+        return;
+      }
+
+      ui.alert('Success', 'Created ' + rackResult.createdItems.length + ' rack item(s) in Arena.', ui.ButtonSet.OK);
+    }
+
+    // Step 5: Show summary and confirm
+    var summaryMsg = '========================================\n' +
+                     'READY TO CREATE POD STRUCTURE\n' +
+                     '========================================\n\n' +
+                     'The following items will be created in Arena:\n\n' +
+                     '1. ROW ITEMS (' + overviewData.length + ' total)\n';
+
+    overviewData.forEach(function(row, index) {
+      var rackCount = row.positions.length;
+      summaryMsg += '   • Row ' + row.rowNumber + ' - Contains ' + rackCount + ' rack(s)\n';
+    });
+
+    summaryMsg += '\n2. POD ITEM (1 total)\n';
+    summaryMsg += '   • Top-level assembly containing all ' + overviewData.length + ' rows\n\n';
+    summaryMsg += '----------------------------------------\n';
+    summaryMsg += 'You will be prompted to name each item.\n\n';
+    summaryMsg += 'Continue?';
+
+    var confirmResponse = ui.alert('Confirm POD Creation', summaryMsg, ui.ButtonSet.YES_NO);
+
+    if (confirmResponse !== ui.Button.YES) {
+      ui.alert('Cancelled', 'POD creation cancelled.', ui.ButtonSet.OK);
+      return;
+    }
+
+    // Step 6: Create Row items
+    var rowItems = createRowItems(overviewData, rowLocationAttr);
+
+    if (!rowItems) {
+      return; // Cancelled or error
+    }
+
+    // Step 7: Create POD item
+    ui.alert('Creating POD', 'Creating POD item in Arena...', ui.ButtonSet.OK);
+    var podItem = createPODItem(rowItems);
+
+    if (!podItem) {
+      return; // Cancelled or error
+    }
+
+    // Step 8: Update overview sheet with POD/Row info
+    updateOverviewWithPODInfo(overviewSheet, podItem, rowItems);
+
+    // Success message
+    var successMsg = 'Successfully created POD structure in Arena!\n\n' +
+                     'POD: ' + podItem.name + ' (' + podItem.itemNumber + ')\n' +
+                     'Rows: ' + rowItems.length + '\n\n' +
+                     'Overview sheet has been updated with Arena links.';
+
+    ui.alert('Success', successMsg, ui.ButtonSet.OK);
+
+  } catch (error) {
+    Logger.log('Error in pushPODStructureToArena: ' + error.message);
+    ui.alert('Error', 'Failed to create POD structure: ' + error.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Updates overview sheet with POD and Row information
+ * @param {Sheet} sheet - Overview sheet
+ * @param {Object} podItem - POD item metadata
+ * @param {Array} rowItems - Array of row item objects
+ */
+function updateOverviewWithPODInfo(sheet, podItem, rowItems) {
+  // Insert column after row numbers for Row Item info
+  var data = sheet.getDataRange().getValues();
+
+  // Find header row
+  var headerRow = -1;
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    for (var j = 0; j < row.length; j++) {
+      if (row[j] && row[j].toString().toLowerCase().indexOf('pos') === 0) {
+        headerRow = i + 1; // Convert to 1-based
+        break;
+      }
+    }
+    if (headerRow !== -1) break;
+  }
+
+  if (headerRow === -1) return;
+
+  // Insert new column at position 2 (after row numbers)
+  sheet.insertColumnAfter(1);
+
+  // Set header
+  sheet.getRange(headerRow, 2).setValue('Row Item');
+  sheet.getRange(headerRow, 2).setFontWeight('bold').setBackground('#f0f0f0');
+
+  // Get Arena base URL for links
+  var credentials = getArenaCredentials();
+  var arenaBaseUrl = credentials.apiBase.replace('/api/v1', '');
+
+  // Add row item links
+  rowItems.forEach(function(rowItem) {
+    var arenaUrl = arenaBaseUrl + '/items/' + rowItem.guid;
+    var formula = '=HYPERLINK("' + arenaUrl + '", "' + rowItem.itemNumber + '")';
+    sheet.getRange(rowItem.sheetRow, 2).setFormula(formula);
+    sheet.getRange(rowItem.sheetRow, 2).setFontColor('#0000FF');
+  });
+
+  // Add POD info at top (in a merged cell above the grid)
+  sheet.insertRowBefore(1);
+  sheet.getRange(1, 1, 1, 10).merge();
+  var podUrl = arenaBaseUrl + '/items/' + podItem.guid;
+  var podFormula = '=HYPERLINK("' + podUrl + '", "POD: ' + podItem.name + ' (' + podItem.itemNumber + ')")';
+  sheet.getRange(1, 1).setFormula(podFormula);
+  sheet.getRange(1, 1).setFontWeight('bold').setFontSize(12).setFontColor('#0000FF');
+
+  Logger.log('Updated overview sheet with POD and Row information');
+}

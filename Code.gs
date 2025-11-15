@@ -34,10 +34,12 @@ function onOpen(e) {
     .addSeparator()
     .addSubMenu(ui.createMenu('BOM Operations')
       .addItem('Create Consolidated BOM', 'createConsolidatedBOMSheet')
-      .addItem('Push BOM to Arena', 'pushConsolidatedBOMToArena'))
+      .addItem('Push POD Structure to Arena', 'pushPODStructureToArena'))
     .addSeparator()
     .addItem('Test Connection', 'testArenaConnection')
     .addItem('Clear Credentials', 'clearCredentials')
+    .addSeparator()
+    .addItem('Help & Documentation', 'showHelp')
     .addToUi();
 }
 
@@ -381,6 +383,16 @@ function showRackPicker() {
   var html = HtmlService.createHtmlOutputFromFile('RackPicker')
     .setTitle('Rack Picker');
   SpreadsheetApp.getUi().showSidebar(html);
+}
+
+/**
+ * Shows the help modal with documentation and guides
+ */
+function showHelp() {
+  var html = HtmlService.createHtmlOutputFromFile('HelpModal')
+    .setWidth(850)
+    .setHeight(650);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Arena Data Center - Help Guide');
 }
 
 /**
