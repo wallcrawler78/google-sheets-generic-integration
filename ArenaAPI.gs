@@ -294,49 +294,20 @@ ArenaAPIClient.prototype.getItemByNumber = function(itemNumber) {
   try {
     Logger.log('Searching for item by number: ' + itemNumber);
 
-    // Try method 1: Direct item search
-    try {
-      var searchResults = this.searchItems(itemNumber);
-      Logger.log('Search results: ' + JSON.stringify(searchResults));
+    // Fetch all items and filter (searchItems endpoint is broken)
+    // Use getAllItems() for comprehensive search
+    Logger.log('Fetching all items to search for: ' + itemNumber);
+    var allItems = this.getAllItems();
 
-      // Handle different response structures
-      var items = searchResults.results || searchResults.Results || [];
+    Logger.log('Fetched ' + allItems.length + ' items, searching for exact match: ' + itemNumber);
 
-      if (items.length === 0) {
-        Logger.log('No items found in search results');
-      } else {
-        // Find exact match by item number
-        for (var i = 0; i < items.length; i++) {
-          var item = items[i];
-          var number = item.number || item.Number || '';
-
-          if (number === itemNumber) {
-            Logger.log('Found exact match for item: ' + itemNumber);
-            return item;
-          }
-        }
-
-        // If no exact match, return first result
-        Logger.log('No exact match, returning first result');
-        return items[0];
-      }
-    } catch (searchError) {
-      Logger.log('Search method failed: ' + searchError.message);
-    }
-
-    // Method 2: Try fetching all items and filtering
-    Logger.log('Attempting to fetch all items...');
-    var allItemsResponse = this.getItems({ limit: 100 });
-    var allItems = allItemsResponse.results || allItemsResponse.Results || [];
-
-    Logger.log('Fetched ' + allItems.length + ' items, searching for: ' + itemNumber);
-
+    // Find exact match by item number
     for (var i = 0; i < allItems.length; i++) {
       var item = allItems[i];
       var number = item.number || item.Number || '';
 
       if (number === itemNumber) {
-        Logger.log('Found item via getItems: ' + itemNumber);
+        Logger.log('✓ Found exact match for item: ' + itemNumber);
         return item;
       }
     }

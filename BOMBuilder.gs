@@ -312,7 +312,7 @@ function buildBOMStructure(sheet) {
  * Syncs BOM lines to Arena
  * @param {ArenaAPIClient} client - Arena API client
  * @param {string} parentGuid - Parent item GUID
- * @param {Array} bomLines - Array of BOM line objects
+ * @param {Array} bomLines - Array of BOM line objects with itemGuid and itemNumber
  */
 function syncBOMToArena(client, parentGuid, bomLines) {
   // First, get existing BOM lines for this item
@@ -343,21 +343,16 @@ function syncBOMToArena(client, parentGuid, bomLines) {
 
   bomLines.forEach(function(line, index) {
     try {
-      // Find the item by number
-      var searchResults = client.searchItems(line.itemNumber);
-      var items = searchResults.results || searchResults.Results || [];
-
-      if (items.length === 0) {
-        Logger.log('Warning: Item not found in Arena: ' + line.itemNumber);
+      // Use the itemGuid that was passed in (no longer searching)
+      if (!line.itemGuid) {
+        Logger.log('Error: BOM line missing itemGuid for ' + line.itemNumber);
         return;
       }
-
-      var itemGuid = items[0].guid || items[0].Guid;
 
       // Create BOM line
       var bomLineData = {
         item: {
-          guid: itemGuid
+          guid: line.itemGuid
         },
         quantity: line.quantity,
         level: line.level,
@@ -369,7 +364,7 @@ function syncBOMToArena(client, parentGuid, bomLines) {
         payload: bomLineData
       });
 
-      Logger.log('Added BOM line ' + (index + 1) + ': ' + line.itemNumber);
+      Logger.log('Added BOM line ' + (index + 1) + ': ' + line.itemNumber + ' (GUID: ' + line.itemGuid + ')');
 
       // Add delay to avoid rate limiting
       Utilities.sleep(100);
@@ -1547,13 +1542,32 @@ function createRowItems(rowData, rowLocationAttr, rowCategory) {
       }
 
       // Create BOM for row (add each rack with its quantity)
+      // First, look up GUIDs for each rack from Arena
       var bomLines = [];
       for (var rackNumber in rackCounts) {
-        bomLines.push({
-          itemNumber: rackNumber,
-          quantity: rackCounts[rackNumber],
-          level: 0
-        });
+        try {
+          Logger.log('Looking up GUID for rack: ' + rackNumber);
+          var rackItem = client.getItemByNumber(rackNumber);
+
+          if (!rackItem) {
+            Logger.log('ERROR: Rack item not found in Arena: ' + rackNumber);
+            throw new Error('Rack item not found in Arena: ' + rackNumber + '. Please ensure all rack items exist in Arena before creating rows.');
+          }
+
+          var rackGuid = rackItem.guid || rackItem.Guid;
+
+          bomLines.push({
+            itemNumber: rackNumber,
+            itemGuid: rackGuid,  // Add GUID from Arena lookup
+            quantity: rackCounts[rackNumber],
+            level: 0
+          });
+
+          Logger.log('✓ Found rack GUID: ' + rackNumber + ' → ' + rackGuid);
+        } catch (rackError) {
+          Logger.log('ERROR looking up rack ' + rackNumber + ': ' + rackError.message);
+          throw rackError;  // Stop processing if we can't find a rack
+        }
       }
 
       syncBOMToArena(client, rowItemGuid, bomLines);
@@ -1674,6 +1688,7 @@ function createPODItem(rowItems, podCategory) {
     var bomLines = rowItems.map(function(row) {
       return {
         itemNumber: row.itemNumber,
+        itemGuid: row.guid,  // Use GUID from created row items
         quantity: 1,
         level: 0
       };
