@@ -19,7 +19,7 @@ function onOpen(e) {
     .addSubMenu(ui.createMenu('Configuration')
       .addItem('Configure Arena Connection', 'showLoginWizard')
       .addItem('Configure Item Columns', 'showConfigureColumns')
-      .addItem('Configure Category Colors', 'showConfigureColors')
+      .addItem('Configure Categories', 'showConfigureColors')
       .addItem('Configure BOM Levels', 'showConfigureBOMLevels'))
     .addSeparator()
     .addItem('Show Item Picker', 'showItemPicker')
@@ -244,7 +244,7 @@ function showConfigureColors() {
  */
 function loadCategoryColorData() {
   return {
-    categories: getArenaCategories(),
+    categories: getCategoriesWithFavorites(),
     colors: getCategoryColors()
   };
 }
@@ -351,7 +351,7 @@ function showConfigureBOMLevels() {
 function loadBOMHierarchyData() {
   return {
     hierarchy: getBOMHierarchy(),
-    categories: getArenaCategories()
+    categories: getCategoriesWithFavorites()
   };
 }
 
