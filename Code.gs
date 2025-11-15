@@ -19,7 +19,8 @@ function onOpen(e) {
     .addSubMenu(ui.createMenu('Configuration')
       .addItem('Configure Arena Connection', 'showLoginWizard')
       .addItem('Configure Item Columns', 'showConfigureColumns')
-      .addItem('Configure Categories', 'showConfigureColors')
+      .addItem('Configure Category Colors', 'showConfigureColors')
+      .addItem('Configure Rack Colors', 'showConfigureRackColors')
       .addItem('Configure BOM Levels', 'showConfigureBOMLevels'))
     .addSeparator()
     .addItem('Show Item Picker', 'showItemPicker')
@@ -234,6 +235,17 @@ function showConfigureColors() {
     .setHeight(600)
     .setTitle('Configure Category Colors');
   SpreadsheetApp.getUi().showModalDialog(html, 'Category Colors');
+}
+
+/**
+ * Shows the rack color configuration dialog
+ */
+function showConfigureRackColors() {
+  var html = HtmlService.createHtmlOutputFromFile('ConfigureRackColors')
+    .setWidth(650)
+    .setHeight(600)
+    .setTitle('Configure Rack Colors');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Rack Colors');
 }
 
 /**
@@ -560,11 +572,48 @@ function getItemQuantitiesWithScope(scope) {
         }
       });
     } else if (scope === 'racks') {
-      // Find all rack config sheets
-      var rackConfigs = getAllRackConfigTabs();
-      rackConfigs.forEach(function(config) {
-        sheetsToScan.push(config.sheet);
-      });
+      // For "All Racks" scope, we need to aggregate properly:
+      // 1. Find overview sheet
+      // 2. Count how many times each rack is placed
+      // 3. For each rack, get its BOM and multiply quantities
+
+      Logger.log('Using rack aggregation logic for accurate quantities');
+
+      // Find overview sheet
+      var allSheets = spreadsheet.getSheets();
+      var overviewSheet = null;
+      for (var i = 0; i < allSheets.length; i++) {
+        if (allSheets[i].getName().toLowerCase().indexOf('overview') !== -1) {
+          overviewSheet = allSheets[i];
+          break;
+        }
+      }
+
+      if (overviewSheet) {
+        // Use the proper BOM aggregation logic
+        var bomData = buildConsolidatedBOMFromOverview(overviewSheet);
+
+        if (bomData && bomData.lines) {
+          bomData.lines.forEach(function(line) {
+            quantities[line.itemNumber] = line.quantity;
+          });
+        }
+
+        Logger.log('Aggregated quantities from overview BOM: ' + Object.keys(quantities).length + ' items');
+
+        return {
+          quantities: quantities,
+          sheetsScanned: 1,
+          scope: scope
+        };
+      } else {
+        // Fallback: just scan rack sheets without aggregation
+        Logger.log('No overview sheet found, falling back to simple rack scan');
+        var rackConfigs = getAllRackConfigTabs();
+        rackConfigs.forEach(function(config) {
+          sheetsToScan.push(config.sheet);
+        });
+      }
     } else if (scope === 'all') {
       sheetsToScan = spreadsheet.getSheets();
     }
@@ -914,6 +963,10 @@ function insertSelectedRack(rack) {
     formula = '=HYPERLINK("#gid=' + sheetId + '", "' + itemNumber + '")';
   }
 
+  // Get rack color (custom or auto-generated)
+  var rackColor = getRackColor(itemNumber);
+  Logger.log('Using color ' + rackColor + ' for rack ' + itemNumber);
+
   // Insert into each cell in the range
   for (var row = 1; row <= numRows; row++) {
     for (var col = 1; col <= numCols; col++) {
@@ -926,6 +979,9 @@ function insertSelectedRack(rack) {
         cell.setValue(itemNumber);
       }
 
+      // Apply rack color as background
+      cell.setBackground(rackColor);
+
       // Center align and make bold
       cell.setHorizontalAlignment('center');
       cell.setVerticalAlignment('middle');
@@ -933,7 +989,7 @@ function insertSelectedRack(rack) {
     }
   }
 
-  Logger.log('Inserted rack: ' + itemNumber + ' in ' + totalCells + ' cells at ' + range.getA1Notation());
+  Logger.log('Inserted rack: ' + itemNumber + ' in ' + totalCells + ' cells at ' + range.getA1Notation() + ' with color ' + rackColor);
 }
 
 /**
@@ -948,8 +1004,9 @@ function createRackConfigFromArenaItem(arenaItem) {
   var itemNumber = arenaItem.itemNumber || arenaItem.number || arenaItem.Number;
   var itemName = arenaItem.itemName || arenaItem.name || arenaItem.Name || itemNumber;
   var description = arenaItem.description || arenaItem.Description || '';
+  var itemGuid = arenaItem.guid || arenaItem.Guid || null;
 
-  Logger.log('Creating rack config for: ' + itemNumber);
+  Logger.log('Creating rack config for: ' + itemNumber + ' (GUID: ' + itemGuid + ')');
 
   // Create the new sheet
   var sheetName = 'Rack - ' + itemNumber + ' (' + itemName + ')';
@@ -996,13 +1053,17 @@ function createRackConfigFromArenaItem(arenaItem) {
   // Try to pull BOM from Arena and populate the sheet
   try {
     Logger.log('Pulling BOM for rack: ' + itemNumber);
-    pullBOMForRack(newSheet, itemNumber);
+    pullBOMForRack(newSheet, itemNumber, itemGuid);
     Logger.log('BOM pull completed for: ' + itemNumber);
   } catch (bomError) {
     Logger.log('Could not pull BOM from Arena: ' + bomError.message);
-    // Add instruction row if BOM pull failed
-    newSheet.getRange(3, 1).setValue('Use Item Picker to add components →');
-    newSheet.getRange(3, 1, 1, headers.length).setFontStyle('italic').setFontColor('#666666');
+    Logger.log('BOM Error Stack: ' + bomError.stack);
+
+    // Add detailed error message to sheet
+    newSheet.getRange(3, 1).setValue('⚠️ BOM Pull Failed: ' + bomError.message);
+    newSheet.getRange(3, 1, 1, headers.length).setFontStyle('italic').setFontColor('#ea4335');
+    newSheet.getRange(4, 1).setValue('→ Use Item Picker to manually add components');
+    newSheet.getRange(4, 1, 1, headers.length).setFontStyle('italic').setFontColor('#666666');
   }
 
   Logger.log('Rack config sheet created: ' + sheetName);
@@ -1013,35 +1074,67 @@ function createRackConfigFromArenaItem(arenaItem) {
  * Pulls BOM from Arena for a rack and populates the rack config sheet
  * @param {Sheet} sheet - Rack config sheet to populate
  * @param {string} itemNumber - Arena item number to pull BOM from
+ * @param {string} itemGuid - Optional Arena item GUID (if already known, skips item lookup)
  */
-function pullBOMForRack(sheet, itemNumber) {
-  var arenaClient = new ArenaAPIClient();
+function pullBOMForRack(sheet, itemNumber, itemGuid) {
+  try {
+    var arenaClient = new ArenaAPIClient();
 
-  // Get the item from Arena
-  var item = arenaClient.getItemByNumber(itemNumber);
+    Logger.log('pullBOMForRack: Starting BOM pull for item: ' + itemNumber);
 
-  if (!item) {
-    throw new Error('Item not found in Arena: ' + itemNumber);
-  }
+    // If GUID is provided, use it directly; otherwise look up the item
+    if (!itemGuid) {
+      Logger.log('pullBOMForRack: GUID not provided, searching for item by number');
+      var item = arenaClient.getItemByNumber(itemNumber);
 
-  var itemGuid = item.guid || item.Guid;
+      if (!item) {
+        throw new Error('Item not found in Arena: ' + itemNumber);
+      }
 
-  Logger.log('Fetching BOM for item: ' + itemNumber + ' (GUID: ' + itemGuid + ')');
+      itemGuid = item.guid || item.Guid;
+    }
 
-  // Get BOM from Arena
-  var bomData = arenaClient.makeRequest('/items/' + itemGuid + '/bom', { method: 'GET' });
-  var bomLines = bomData.results || bomData.Results || [];
+    Logger.log('pullBOMForRack: Using item GUID: ' + itemGuid);
 
-  Logger.log('Retrieved ' + bomLines.length + ' BOM lines from Arena');
+    if (!itemGuid) {
+      throw new Error('Item GUID is missing for item: ' + itemNumber);
+    }
 
-  if (bomLines.length === 0) {
-    Logger.log('No BOM lines found for item: ' + itemNumber);
-    return;
+    Logger.log('pullBOMForRack: Fetching BOM for item: ' + itemNumber + ' (GUID: ' + itemGuid + ')');
+
+    // Get BOM from Arena
+    var bomData = arenaClient.makeRequest('/items/' + itemGuid + '/bom', { method: 'GET' });
+    Logger.log('pullBOMForRack: BOM API response received');
+    Logger.log('pullBOMForRack: Response structure: ' + JSON.stringify(Object.keys(bomData || {})));
+
+    var bomLines = bomData.results || bomData.Results || [];
+
+    Logger.log('pullBOMForRack: Retrieved ' + bomLines.length + ' BOM lines from Arena');
+
+    if (bomLines.length === 0) {
+      Logger.log('pullBOMForRack: No BOM lines found for item: ' + itemNumber);
+      throw new Error('No BOM found for item ' + itemNumber + '. The item may not have any components.');
+    }
+  } catch (error) {
+    Logger.log('pullBOMForRack: ERROR - ' + error.message);
+    Logger.log('pullBOMForRack: ERROR Stack - ' + error.stack);
+    throw error;
   }
 
   // Populate sheet with BOM data
   var rowData = [];
   var categoryColors = getCategoryColors();
+
+  Logger.log('pullBOMForRack: Processing ' + bomLines.length + ' BOM lines');
+
+  // Log sample BOM line structure
+  if (bomLines.length > 0) {
+    Logger.log('pullBOMForRack: Sample BOM line structure: ' + JSON.stringify(Object.keys(bomLines[0])));
+    if (bomLines[0].item || bomLines[0].Item) {
+      var sampleItem = bomLines[0].item || bomLines[0].Item;
+      Logger.log('pullBOMForRack: Sample item structure: ' + JSON.stringify(Object.keys(sampleItem)));
+    }
+  }
 
   bomLines.forEach(function(line) {
     var bomItem = line.item || line.Item || {};
@@ -1053,6 +1146,26 @@ function pullBOMForRack(sheet, itemNumber) {
 
     var categoryObj = bomItem.category || bomItem.Category || {};
     var categoryName = categoryObj.name || categoryObj.Name || '';
+
+    // If description or category is missing, we may need to fetch full item details
+    if (!bomItemDesc || !categoryName) {
+      var bomItemGuid = bomItem.guid || bomItem.Guid;
+      if (bomItemGuid) {
+        try {
+          Logger.log('pullBOMForRack: Fetching full details for item: ' + bomItemNumber + ' (GUID: ' + bomItemGuid + ')');
+          var fullItem = arenaClient.getItem(bomItemGuid);
+
+          if (fullItem) {
+            bomItemDesc = bomItemDesc || fullItem.description || fullItem.Description || '';
+
+            var fullCategoryObj = fullItem.category || fullItem.Category || {};
+            categoryName = categoryName || fullCategoryObj.name || fullCategoryObj.Name || '';
+          }
+        } catch (itemError) {
+          Logger.log('pullBOMForRack: Could not fetch full details for ' + bomItemNumber + ': ' + itemError.message);
+        }
+      }
+    }
 
     rowData.push([
       bomItemNumber,

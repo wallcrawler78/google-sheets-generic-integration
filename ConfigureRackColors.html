@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 600px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #1a73e8;
+      margin-top: 0;
+      font-size: 20px;
+      border-bottom: 2px solid #1a73e8;
+      padding-bottom: 10px;
+    }
+
+    .description {
+      margin-bottom: 20px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .info-box {
+      padding: 12px;
+      background: #e8f0fe;
+      border-left: 4px solid #1a73e8;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #333;
+    }
+
+    .search-box {
+      margin-bottom: 15px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .rack-list {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+    }
+
+    .rack-item {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: #f9f9f9;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .rack-info {
+      flex: 1;
+      margin-right: 10px;
+    }
+
+    .rack-number {
+      font-weight: bold;
+      font-size: 14px;
+      color: #1a73e8;
+    }
+
+    .rack-name {
+      font-size: 12px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .color-preview {
+      width: 80px;
+      height: 35px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-right: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #666;
+      position: relative;
+    }
+
+    .color-preview.auto {
+      font-style: italic;
+    }
+
+    .auto-badge {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      background: rgba(255,255,255,0.8);
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-size: 9px;
+      font-weight: bold;
+    }
+
+    input[type="color"] {
+      width: 60px;
+      height: 35px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .reset-icon {
+      cursor: pointer;
+      font-size: 18px;
+      color: #ea4335;
+      margin-left: 8px;
+      user-select: none;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+      title: "Reset to auto color";
+    }
+
+    .reset-icon:hover {
+      opacity: 1;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+      background-color: #1a73e8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #1557b0;
+    }
+
+    .btn-secondary {
+      background-color: #f1f3f4;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background-color: #e8eaed;
+    }
+
+    .btn-reset {
+      background-color: #ea4335;
+      color: white;
+    }
+
+    .btn-reset:hover {
+      background-color: #d33b2c;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1a73e8;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .message {
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    .message.success {
+      background-color: #e6f4ea;
+      color: #137333;
+      border: 1px solid #81c995;
+    }
+
+    .message.error {
+      background-color: #fce8e6;
+      color: #c5221f;
+      border: 1px solid #f28b82;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Configure Rack Colors</h2>
+
+    <div class="description">
+      Customize colors for rack configurations when placed in overview sheets. Colors are auto-assigned by default but can be customized here.
+    </div>
+
+    <div class="info-box">
+      💡 <strong>Auto Colors:</strong> Each rack automatically gets a unique color based on its item number. Override any rack color below, or reset to auto color anytime.
+    </div>
+
+    <div id="message" class="message hidden"></div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Loading rack configurations...</p>
+    </div>
+
+    <div id="contentSection" class="hidden">
+      <div class="search-box">
+        <input type="text" id="searchBox" placeholder="Search racks by number or name..." onkeyup="filterRacks()">
+      </div>
+
+      <div id="rackList" class="rack-list"></div>
+    </div>
+
+    <div class="button-group">
+      <button type="button" class="btn-reset" onclick="resetAllToAuto()">Reset All to Auto</button>
+      <button type="button" class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+      <button type="button" class="btn-primary" onclick="saveColors()">Save</button>
+    </div>
+  </div>
+
+  <script>
+    var racks = [];
+    var colors = {}; // Custom rack colors (overrides)
+    var allRacks = []; // Keep unfiltered list for search
+
+    // Load rack configs and current colors on page load
+    google.script.run
+      .withSuccessHandler(function(data) {
+        racks = data.racks || [];
+        allRacks = racks.slice(); // Copy for filtering
+        colors = data.colors || {};
+
+        renderRacks();
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('contentSection').classList.remove('hidden');
+      })
+      .withFailureHandler(function(error) {
+        showMessage('Error loading rack configurations: ' + error.message, 'error');
+        document.getElementById('loading').classList.add('hidden');
+      })
+      .loadRackColorData();
+
+    function filterRacks() {
+      var searchTerm = document.getElementById('searchBox').value.toLowerCase();
+
+      if (!searchTerm) {
+        racks = allRacks.slice();
+      } else {
+        racks = allRacks.filter(function(rack) {
+          var number = (rack.itemNumber || '').toLowerCase();
+          var name = (rack.itemName || '').toLowerCase();
+          return number.indexOf(searchTerm) !== -1 || name.indexOf(searchTerm) !== -1;
+        });
+      }
+
+      renderRacks();
+    }
+
+    function renderRacks() {
+      var list = document.getElementById('rackList');
+      list.innerHTML = '';
+
+      if (!racks.length) {
+        list.innerHTML = '<p style="text-align:center;color:#999;">No rack configurations found</p>';
+        return;
+      }
+
+      racks.forEach(function(rack) {
+        var item = document.createElement('div');
+        item.className = 'rack-item';
+
+        // Rack info
+        var info = document.createElement('div');
+        info.className = 'rack-info';
+
+        var number = document.createElement('div');
+        number.className = 'rack-number';
+        number.textContent = rack.itemNumber;
+
+        var name = document.createElement('div');
+        name.className = 'rack-name';
+        name.textContent = rack.itemName || '';
+
+        info.appendChild(number);
+        info.appendChild(name);
+
+        // Get current color (custom or auto)
+        var customColor = colors[rack.itemNumber];
+        var isAuto = !customColor;
+
+        // Get what color would be used
+        var displayColor = customColor || getAutoColor(rack.itemNumber);
+
+        // Color preview
+        var preview = document.createElement('div');
+        preview.className = 'color-preview';
+        if (isAuto) preview.classList.add('auto');
+        preview.style.backgroundColor = displayColor;
+
+        if (isAuto) {
+          var badge = document.createElement('span');
+          badge.className = 'auto-badge';
+          badge.textContent = 'AUTO';
+          preview.appendChild(badge);
+        }
+
+        // Color picker
+        var colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = displayColor;
+        colorInput.setAttribute('data-rack', rack.itemNumber);
+        colorInput.addEventListener('change', function() {
+          colors[rack.itemNumber] = this.value;
+          preview.style.backgroundColor = this.value;
+          preview.classList.remove('auto');
+          var existingBadge = preview.querySelector('.auto-badge');
+          if (existingBadge) existingBadge.remove();
+        });
+
+        // Reset button (only show if custom color is set)
+        var resetBtn = document.createElement('span');
+        resetBtn.className = 'reset-icon';
+        resetBtn.textContent = '↺';
+        resetBtn.title = 'Reset to auto color';
+        resetBtn.style.visibility = isAuto ? 'hidden' : 'visible';
+        resetBtn.addEventListener('click', function() {
+          delete colors[rack.itemNumber];
+          var autoColor = getAutoColor(rack.itemNumber);
+          colorInput.value = autoColor;
+          preview.style.backgroundColor = autoColor;
+          preview.classList.add('auto');
+          resetBtn.style.visibility = 'hidden';
+
+          // Re-add auto badge
+          var badge = document.createElement('span');
+          badge.className = 'auto-badge';
+          badge.textContent = 'AUTO';
+          preview.appendChild(badge);
+        });
+
+        item.appendChild(info);
+        item.appendChild(preview);
+        item.appendChild(colorInput);
+        item.appendChild(resetBtn);
+        list.appendChild(item);
+      });
+    }
+
+    // Generate consistent auto color from rack number (hash-based)
+    function getAutoColor(rackNumber) {
+      // Simple hash function for consistent colors
+      var hash = 0;
+      for (var i = 0; i < rackNumber.length; i++) {
+        hash = rackNumber.charCodeAt(i) + ((hash << 5) - hash);
+      }
+
+      // Convert to HSL for better color distribution
+      var h = Math.abs(hash % 360);
+      var s = 65 + (Math.abs(hash) % 20); // 65-85% saturation
+      var l = 80 + (Math.abs(hash >> 8) % 15); // 80-95% lightness (pastel)
+
+      return hslToHex(h, s, l);
+    }
+
+    // Convert HSL to Hex
+    function hslToHex(h, s, l) {
+      s /= 100;
+      l /= 100;
+
+      var c = (1 - Math.abs(2 * l - 1)) * s;
+      var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+      var m = l - c/2;
+      var r = 0, g = 0, b = 0;
+
+      if (0 <= h && h < 60) {
+        r = c; g = x; b = 0;
+      } else if (60 <= h && h < 120) {
+        r = x; g = c; b = 0;
+      } else if (120 <= h && h < 180) {
+        r = 0; g = c; b = x;
+      } else if (180 <= h && h < 240) {
+        r = 0; g = x; b = c;
+      } else if (240 <= h && h < 300) {
+        r = x; g = 0; b = c;
+      } else if (300 <= h && h < 360) {
+        r = c; g = 0; b = x;
+      }
+
+      var rHex = Math.round((r + m) * 255).toString(16).padStart(2, '0');
+      var gHex = Math.round((g + m) * 255).toString(16).padStart(2, '0');
+      var bHex = Math.round((b + m) * 255).toString(16).padStart(2, '0');
+
+      return '#' + rHex + gHex + bHex;
+    }
+
+    function saveColors() {
+      google.script.run
+        .withSuccessHandler(function() {
+          showMessage('Rack colors saved successfully!', 'success');
+          setTimeout(function() {
+            google.script.host.close();
+          }, 1500);
+        })
+        .withFailureHandler(function(error) {
+          showMessage('Error saving colors: ' + error.message, 'error');
+        })
+        .saveRackColors(colors);
+    }
+
+    function resetAllToAuto() {
+      if (!confirm('Reset all rack colors to auto-generated colors?')) {
+        return;
+      }
+
+      colors = {};
+      renderRacks();
+      showMessage('All colors reset to auto', 'success');
+    }
+
+    function showMessage(text, type) {
+      var messageDiv = document.getElementById('message');
+      messageDiv.textContent = text;
+      messageDiv.className = 'message ' + type;
+      messageDiv.classList.remove('hidden');
+
+      setTimeout(function() {
+        messageDiv.classList.add('hidden');
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

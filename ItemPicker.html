@@ -318,6 +318,14 @@
       font-size: 13px;
       font-weight: 500;
       color: #1a73e8;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .qty-item-number:hover {
+      text-decoration: underline;
+      color: #174ea6;
     }
 
     .qty-item-name {
@@ -875,8 +883,18 @@
         numberSpan.className = 'qty-item-number';
         numberSpan.textContent = number;
 
-        // Try to find item name
+        // Try to find item for name and GUID
         var matchingItem = allItems.find(function(i) { return i.number === number; });
+
+        // Make item number clickable to open in Arena
+        if (matchingItem && matchingItem.guid) {
+          numberSpan.style.cursor = 'pointer';
+          numberSpan.title = 'Open in Arena';
+          numberSpan.onclick = function() {
+            openItemInArena(matchingItem.guid);
+          };
+        }
+
         if (matchingItem && matchingItem.name) {
           var nameSpan = document.createElement('div');
           nameSpan.className = 'qty-item-name';
@@ -898,6 +916,31 @@
 
       document.getElementById('uniqueCount').textContent = itemNumbers.length;
       document.getElementById('totalQuantity').textContent = totalQty;
+    }
+
+    // Helper function to open item in Arena
+    function openItemInArena(itemGuid) {
+      if (!itemGuid) {
+        alert('Item GUID not available');
+        return;
+      }
+
+      // Get workspace ID from server and construct Arena URL
+      google.script.run
+        .withSuccessHandler(function(workspaceId) {
+          if (workspaceId) {
+            // Arena web UI URL format: https://app.arenasolutions.com/<workspaceId>/item/<itemGuid>
+            var arenaUrl = 'https://app.arenasolutions.com/' + workspaceId + '/item/' + itemGuid;
+            window.open(arenaUrl, '_blank');
+          } else {
+            alert('Workspace ID not configured');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error getting workspace ID:', error);
+          alert('Could not open item in Arena: ' + error.message);
+        })
+        .getWorkspaceId();
     }
   </script>
 </body>

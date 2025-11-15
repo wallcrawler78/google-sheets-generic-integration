@@ -298,12 +298,29 @@
       font-size: 13px;
       font-weight: 500;
       color: #1a73e8;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .qty-item-number:hover {
+      text-decoration: underline;
+      color: #174ea6;
     }
 
     .qty-item-name {
       font-size: 11px;
       color: #666;
       margin-top: 2px;
+    }
+
+    .qty-color-indicator {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      border: 1px solid #ddd;
+      margin-right: 10px;
+      flex-shrink: 0;
     }
 
     .qty-badge {
@@ -485,6 +502,9 @@
     var filteredArenaItems = [];
     var selectedArenaItem = null;
     var arenaItemsLoaded = false;
+
+    // Store arena items with GUID for linking
+    var arenaItemsLookup = {};
 
     // Load rack configurations when sidebar opens
     google.script.run
@@ -672,6 +692,16 @@
           allArenaItems = data.items || [];
           filteredArenaItems = allArenaItems;
           arenaItemsLoaded = true;
+
+          // Build lookup for quantities tab
+          arenaItemsLookup = {};
+          allArenaItems.forEach(function(item) {
+            var number = item.number || item.Number;
+            if (number) {
+              arenaItemsLookup[number] = item;
+            }
+          });
+
           renderArenaItems(filteredArenaItems);
         })
         .withFailureHandler(function(error) {
@@ -871,13 +901,36 @@
         var item = document.createElement('div');
         item.className = 'quantity-item';
 
+        // Add color indicator - get color from server using same logic as placement
+        var colorIndicator = document.createElement('div');
+        colorIndicator.className = 'qty-color-indicator';
+        colorIndicator.style.backgroundColor = getAutoRackColor(number);
+
         var info = document.createElement('div');
         var numberSpan = document.createElement('div');
         numberSpan.className = 'qty-item-number';
         numberSpan.textContent = number;
 
-        // Try to find rack name
+        // Try to find rack name and GUID
         var matchingRack = allRacks.find(function(r) { return r.itemNumber === number; });
+
+        // Check arena items lookup for GUID if not in rack configs
+        var itemGuid = null;
+        if (matchingRack && matchingRack.guid) {
+          itemGuid = matchingRack.guid;
+        } else if (arenaItemsLookup[number]) {
+          itemGuid = arenaItemsLookup[number].guid || arenaItemsLookup[number].Guid;
+        }
+
+        // Make rack number clickable to open in Arena
+        if (itemGuid) {
+          numberSpan.style.cursor = 'pointer';
+          numberSpan.title = 'Open in Arena';
+          numberSpan.onclick = function() {
+            openItemInArena(itemGuid);
+          };
+        }
+
         if (matchingRack && matchingRack.itemName) {
           var nameSpan = document.createElement('div');
           nameSpan.className = 'qty-item-name';
@@ -892,6 +945,7 @@
         badge.className = 'qty-badge';
         badge.textContent = qty;
 
+        item.appendChild(colorIndicator);
         item.appendChild(info);
         item.appendChild(badge);
         container.appendChild(item);
@@ -899,6 +953,82 @@
 
       document.getElementById('uniqueCount').textContent = rackNumbers.length;
       document.getElementById('totalQuantity').textContent = totalQty;
+    }
+
+    // Helper function to open item in Arena
+    function openItemInArena(itemGuid) {
+      if (!itemGuid) {
+        alert('Item GUID not available');
+        return;
+      }
+
+      // Get workspace ID from server and construct Arena URL
+      google.script.run
+        .withSuccessHandler(function(workspaceId) {
+          if (workspaceId) {
+            // Arena web UI URL format: https://app.arenasolutions.com/<workspaceId>/item/<itemGuid>
+            var arenaUrl = 'https://app.arenasolutions.com/' + workspaceId + '/item/' + itemGuid;
+            window.open(arenaUrl, '_blank');
+          } else {
+            alert('Workspace ID not configured');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error getting workspace ID:', error);
+          alert('Could not open item in Arena: ' + error.message);
+        })
+        .getWorkspaceId();
+    }
+
+    // Generate auto color for rack (matches server-side logic)
+    function getAutoRackColor(rackNumber) {
+      if (!rackNumber) {
+        return '#E3F2FD'; // Default light blue
+      }
+
+      // Simple hash function for consistent colors
+      var hash = 0;
+      for (var i = 0; i < rackNumber.length; i++) {
+        hash = rackNumber.charCodeAt(i) + ((hash << 5) - hash);
+      }
+
+      // Convert to HSL for better color distribution
+      var h = Math.abs(hash % 360);           // Hue: 0-360
+      var s = 65 + (Math.abs(hash) % 20);     // Saturation: 65-85%
+      var l = 80 + (Math.abs(hash >> 8) % 15); // Lightness: 80-95% (pastel)
+
+      return hslToHex(h, s, l);
+    }
+
+    // Convert HSL to Hex
+    function hslToHex(h, s, l) {
+      s /= 100;
+      l /= 100;
+
+      var c = (1 - Math.abs(2 * l - 1)) * s;
+      var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+      var m = l - c/2;
+      var r = 0, g = 0, b = 0;
+
+      if (0 <= h && h < 60) {
+        r = c; g = x; b = 0;
+      } else if (60 <= h && h < 120) {
+        r = x; g = c; b = 0;
+      } else if (120 <= h && h < 180) {
+        r = 0; g = c; b = x;
+      } else if (180 <= h && h < 240) {
+        r = 0; g = x; b = c;
+      } else if (240 <= h && h < 300) {
+        r = x; g = 0; b = c;
+      } else if (300 <= h && h < 360) {
+        r = c; g = 0; b = x;
+      }
+
+      var rHex = Math.round((r + m) * 255).toString(16).padStart(2, '0');
+      var gHex = Math.round((g + m) * 255).toString(16).padStart(2, '0');
+      var bHex = Math.round((b + m) * 255).toString(16).padStart(2, '0');
+
+      return '#' + rHex + gHex + bHex;
     }
   </script>
 </body>
