@@ -27,29 +27,126 @@
     .header {
       background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
       color: white;
-      padding: 20px;
+      padding: 12px 15px;
       border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-content {
+      flex: 1;
     }
 
     .header h2 {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: bold;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .header p {
-      font-size: 12px;
+      font-size: 11px;
       opacity: 0.9;
     }
 
+    .help-icon {
+      width: 24px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background 0.2s;
+      position: relative;
+    }
+
+    .help-icon:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .help-tooltip {
+      display: none;
+      position: absolute;
+      top: 32px;
+      right: 0;
+      background: white;
+      color: #333;
+      padding: 12px;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      width: 220px;
+      font-size: 12px;
+      line-height: 1.5;
+      z-index: 1000;
+      border: 1px solid #e0e0e0;
+    }
+
+    .help-icon:hover .help-tooltip {
+      display: block;
+    }
+
+    .help-tooltip strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #1a73e8;
+    }
+
     .filters {
-      padding: 15px;
       background: white;
       border-bottom: 1px solid #e0e0e0;
     }
 
+    .filter-section-header {
+      padding: 8px 15px;
+      background: #f9f9f9;
+      border-bottom: 1px solid #e0e0e0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+      transition: background 0.2s;
+    }
+
+    .filter-section-header:hover {
+      background: #f1f3f4;
+    }
+
+    .filter-section-title {
+      font-size: 12px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .collapse-icon {
+      font-size: 10px;
+      color: #666;
+      transition: transform 0.2s;
+    }
+
+    .collapse-icon.collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .filter-section-content {
+      padding: 10px 15px;
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    }
+
+    .filter-section-content.collapsed {
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
     .filter-group {
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .filter-group:last-child {
@@ -58,18 +155,18 @@
 
     .filter-label {
       display: block;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: bold;
       color: #333;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     select, input[type="text"] {
       width: 100%;
-      padding: 8px 10px;
+      padding: 6px 8px;
       border: 1px solid #ddd;
       border-radius: 4px;
-      font-size: 13px;
+      font-size: 12px;
       font-family: Arial, sans-serif;
     }
 
@@ -84,23 +181,23 @@
     }
 
     .search-box input {
-      padding-left: 32px;
+      padding-left: 28px;
     }
 
     .search-icon {
       position: absolute;
-      left: 10px;
+      left: 8px;
       top: 50%;
       transform: translateY(-50%);
       color: #666;
-      font-size: 14px;
+      font-size: 12px;
     }
 
     .item-count {
-      padding: 8px 15px;
+      padding: 6px 15px;
       background: #f9f9f9;
       border-bottom: 1px solid #e0e0e0;
-      font-size: 12px;
+      font-size: 11px;
       color: #666;
     }
 
@@ -267,26 +364,11 @@
     .error-message {
       background: #fce8e6;
       color: #c5221f;
-      padding: 12px 15px;
-      margin: 10px;
+      padding: 8px 15px;
+      margin: 8px 15px;
       border-radius: 4px;
-      font-size: 13px;
+      font-size: 11px;
       border: 1px solid #f28b82;
-    }
-
-    .instructions {
-      background: #e8f0fe;
-      border-left: 4px solid #1a73e8;
-      padding: 12px 15px;
-      margin: 10px;
-      font-size: 12px;
-      color: #1967d2;
-      line-height: 1.5;
-    }
-
-    .instructions strong {
-      display: block;
-      margin-bottom: 4px;
     }
 
     .hidden {
@@ -351,16 +433,17 @@
     }
 
     .favorites-section {
-      padding: 10px 15px;
+      padding: 8px 15px;
       background: #f9f9f9;
       border-bottom: 1px solid #e0e0e0;
     }
 
     .favorites-title {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: bold;
       color: #666;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
     }
 
     .favorite-buttons {
@@ -403,15 +486,19 @@
 <body>
   <div class="sidebar">
     <div class="header">
-      <h2>Arena Item Picker</h2>
-      <p>Select items from your Arena workspace</p>
-    </div>
-
-    <div class="instructions">
-      <strong>How to use:</strong>
-      1. Select category and lifecycle<br>
-      2. Click an item to select it<br>
-      3. Click a cell in the sheet to insert the item number
+      <div class="header-content">
+        <h2>Arena Item Picker</h2>
+        <p>Select items from your Arena workspace</p>
+      </div>
+      <div class="help-icon">
+        ?
+        <div class="help-tooltip">
+          <strong>How to use:</strong>
+          1. Filter by category/lifecycle<br>
+          2. Click an item to select it<br>
+          3. Click a sheet cell to insert
+        </div>
+      </div>
     </div>
 
     <div class="favorites-section" id="favoritesSection">
@@ -422,33 +509,39 @@
     </div>
 
     <div class="filters">
-      <div class="filter-group">
-        <label class="filter-label">Category</label>
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="categorySearch" placeholder="Search categories...">
+      <div class="filter-section-header" onclick="toggleFilterSection()">
+        <span class="filter-section-title">All Filters</span>
+        <span class="collapse-icon" id="collapseIcon">▼</span>
+      </div>
+      <div class="filter-section-content" id="filterContent">
+        <div class="filter-group">
+          <label class="filter-label">Category</label>
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="categorySearch" placeholder="Search categories...">
+          </div>
+          <select id="categoryFilter" size="5" style="margin-top: 4px;">
+            <option value="">All Categories</option>
+          </select>
         </div>
-        <select id="categoryFilter" size="5" style="margin-top: 6px;">
-          <option value="">All Categories</option>
-        </select>
-      </div>
 
-      <div class="filter-group">
-        <label class="filter-label">Lifecycle Phase</label>
-        <select id="lifecycleFilter">
-          <option value="">All Phases</option>
-          <option value="Production" selected>Production</option>
-          <option value="Prototype">Prototype</option>
-          <option value="In Development">In Development</option>
-          <option value="Obsolete">Obsolete</option>
-        </select>
-      </div>
+        <div class="filter-group">
+          <label class="filter-label">Lifecycle Phase</label>
+          <select id="lifecycleFilter">
+            <option value="">All Phases</option>
+            <option value="Production" selected>Production</option>
+            <option value="Prototype">Prototype</option>
+            <option value="In Development">In Development</option>
+            <option value="Obsolete">Obsolete</option>
+          </select>
+        </div>
 
-      <div class="filter-group">
-        <label class="filter-label">Search Items</label>
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="searchInput" placeholder="Search item number or description...">
+        <div class="filter-group">
+          <label class="filter-label">Search Items</label>
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Search item number or description...">
+          </div>
         </div>
       </div>
     </div>
@@ -833,6 +926,20 @@
 
     // Refresh quantities periodically
     setInterval(loadQuantityTracker, 5000);
+
+    // Toggle filter section
+    function toggleFilterSection() {
+      var content = document.getElementById('filterContent');
+      var icon = document.getElementById('collapseIcon');
+
+      if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        icon.classList.remove('collapsed');
+      } else {
+        content.classList.add('collapsed');
+        icon.classList.add('collapsed');
+      }
+    }
   </script>
 </body>
 </html>
