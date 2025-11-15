@@ -480,9 +480,15 @@ function getCategorySelectorData() {
  * @param {Object} category - Selected category {guid, name} or null
  */
 function setCategorySelection(category) {
+  Logger.log('=== SET CATEGORY SELECTION ===');
   if (category) {
+    Logger.log('Category received from dialog: ' + JSON.stringify(category));
+    Logger.log('Category GUID: ' + category.guid);
+    Logger.log('Category name: ' + category.name);
     PropertiesService.getUserProperties().setProperty('category_selection', JSON.stringify(category));
+    Logger.log('Category selection saved to user properties');
   } else {
+    Logger.log('Category selection cleared (user cancelled)');
     PropertiesService.getUserProperties().deleteProperty('category_selection');
   }
 }

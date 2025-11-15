@@ -1618,9 +1618,14 @@ function createPODItem(rowItems, podCategory) {
  * Creates POD -> Rows -> Racks hierarchy in Arena
  */
 function pushPODStructureToArena() {
+  Logger.log('==========================================');
+  Logger.log('PUSH POD STRUCTURE TO ARENA - START');
+  Logger.log('==========================================');
+
   var ui = SpreadsheetApp.getUi();
 
   try {
+    Logger.log('Step 0: Finding overview sheet...');
     // Find overview sheet
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheets = ss.getSheets();
