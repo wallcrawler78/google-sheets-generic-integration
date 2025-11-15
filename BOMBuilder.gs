@@ -1121,11 +1121,19 @@ function identifyCustomRacks(rackItemNumbers) {
 
       var metadata = getRackConfigMetadata(rackSheet);
 
-      // Check if item exists in Arena
+      // First, check if the rack config already has BOM data (children)
+      // If it does, it was pulled from Arena or manually populated, so skip it
+      var children = getRackConfigChildren(rackSheet);
+      if (children && children.length > 0) {
+        Logger.log('Rack ' + itemNumber + ' has ' + children.length + ' children in config, skipping (already populated)');
+        return; // Skip this rack - it's already set up
+      }
+
+      // No children in config - check if item exists in Arena
       var arenaItem = client.getItemByNumber(itemNumber);
 
       if (!arenaItem) {
-        // Item doesn't exist in Arena - it's a custom rack
+        // Item doesn't exist in Arena - it's a custom rack placeholder
         Logger.log('Custom rack identified (not in Arena): ' + itemNumber);
         customRacks.push({
           itemNumber: itemNumber,
@@ -1136,14 +1144,14 @@ function identifyCustomRacks(rackItemNumbers) {
         return;
       }
 
-      // Item exists - check if it has a BOM
+      // Item exists - check if it has a BOM in Arena
       var itemGuid = arenaItem.guid || arenaItem.Guid;
       var bomData = client.makeRequest('/items/' + itemGuid + '/bom', { method: 'GET' });
       var bomLines = bomData.results || bomData.Results || [];
 
       if (bomLines.length === 0) {
-        // Item exists but has no BOM - it's a custom rack
-        Logger.log('Custom rack identified (no BOM): ' + itemNumber);
+        // Item exists but has no BOM - it's a custom rack that needs BOM
+        Logger.log('Custom rack identified (no BOM in Arena): ' + itemNumber);
         customRacks.push({
           itemNumber: itemNumber,
           metadata: metadata,
@@ -1151,19 +1159,26 @@ function identifyCustomRacks(rackItemNumbers) {
           arenaItem: arenaItem,
           reason: 'no_bom'
         });
+      } else {
+        // Item exists with BOM in Arena, but config is empty - needs to be pulled
+        Logger.log('Rack ' + itemNumber + ' exists in Arena with BOM but local config is empty - should be pulled first');
       }
 
     } catch (error) {
       Logger.log('Error checking rack ' + itemNumber + ': ' + error.message);
-      // If we can't check, assume it's custom to be safe
+
+      // On error, check if rack config has children locally
+      // If it does, skip it (already populated). If not, we can't determine status
       var rackSheet = findRackConfigTab(itemNumber);
       if (rackSheet) {
-        customRacks.push({
-          itemNumber: itemNumber,
-          metadata: getRackConfigMetadata(rackSheet),
-          sheet: rackSheet,
-          reason: 'error_checking'
-        });
+        var children = getRackConfigChildren(rackSheet);
+        if (children && children.length > 0) {
+          Logger.log('Error checking Arena, but rack ' + itemNumber + ' has local BOM data, skipping');
+          return; // Has local data, skip it
+        } else {
+          Logger.log('Error checking Arena and no local BOM data for ' + itemNumber + ' - cannot determine status, skipping to be safe');
+          // Don't add to customRacks if we can't determine status
+        }
       }
     }
   });
