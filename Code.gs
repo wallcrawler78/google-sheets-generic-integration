@@ -438,9 +438,35 @@ function pushBOMToArena() {
 function loadItemPickerData() {
   var arenaClient = new ArenaAPIClient();
 
+  // Fetch all items from Arena
+  var rawItems = arenaClient.getAllItems(400);
+
+  // Map Arena API response to format expected by Item Picker
+  var mappedItems = rawItems.map(function(item) {
+    // Handle both lowercase and capitalized property names from Arena API
+    var categoryObj = item.category || item.Category || {};
+    var lifecycleObj = item.lifecyclePhase || item.LifecyclePhase || {};
+
+    return {
+      guid: item.guid || item.Guid,
+      number: item.number || item.Number || '',
+      name: item.name || item.Name || '',
+      description: item.description || item.Description || '',
+      revisionNumber: item.revisionNumber || item.RevisionNumber || item.revision || item.Revision || '',
+      categoryGuid: categoryObj.guid || categoryObj.Guid || '',
+      categoryName: categoryObj.name || categoryObj.Name || '',
+      categoryPath: categoryObj.path || categoryObj.Path || '',
+      lifecyclePhase: lifecycleObj.name || lifecycleObj.Name || '',
+      lifecyclePhaseGuid: lifecycleObj.guid || lifecycleObj.Guid || '',
+      attributes: item.attributes || item.Attributes || []
+    };
+  });
+
+  Logger.log('Mapped ' + mappedItems.length + ' items for Item Picker');
+
   return {
-    items: arenaClient.getAllItems(200),
-    categories: getArenaCategories(),
+    items: mappedItems,
+    categories: getCategoriesWithFavorites(),
     colors: getCategoryColors()
   };
 }
@@ -477,36 +503,61 @@ function clearSelectedItem() {
 
 /**
  * Gets item quantities from the current sheet
+ * Counts how many times each Arena item number appears in the sheet
  * @return {Object} Map of item numbers to quantities
  */
 function getItemQuantities() {
-  var sheet = SpreadsheetApp.getActiveSheet();
-  var data = sheet.getDataRange().getValues();
-  var quantities = {};
+  try {
+    var sheet = SpreadsheetApp.getActiveSheet();
+    var data = sheet.getDataRange().getValues();
+    var quantities = {};
 
-  // Skip header row
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
+    // Get all item numbers from Arena to use as a lookup
+    var arenaClient = new ArenaAPIClient();
+    var items = arenaClient.getAllItems(400);
 
-    // Look for item numbers in the row (typically in column B or C)
-    for (var j = 0; j < row.length; j++) {
-      var cellValue = row[j];
+    // Build a set of valid item numbers for fast lookup
+    var validItemNumbers = {};
+    items.forEach(function(item) {
+      var itemNum = item.number || item.Number;
+      if (itemNum) {
+        validItemNumbers[itemNum.trim()] = true;
+      }
+    });
 
-      // Check if this looks like an Arena item number
-      if (cellValue && typeof cellValue === 'string' && cellValue.trim()) {
-        var itemNumber = cellValue.trim();
+    Logger.log('Tracking ' + Object.keys(validItemNumbers).length + ' valid item numbers');
 
-        // Count this item
-        if (quantities[itemNumber]) {
-          quantities[itemNumber]++;
-        } else {
-          quantities[itemNumber] = 1;
+    // Skip header row (row 0)
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
+      // Look for item numbers in each cell
+      for (var j = 0; j < row.length; j++) {
+        var cellValue = row[j];
+
+        // Check if cell contains a valid Arena item number
+        if (cellValue && typeof cellValue === 'string') {
+          var trimmed = cellValue.trim();
+
+          // Only count if this is a valid Arena item number
+          if (trimmed && validItemNumbers[trimmed]) {
+            if (quantities[trimmed]) {
+              quantities[trimmed]++;
+            } else {
+              quantities[trimmed] = 1;
+            }
+          }
         }
       }
     }
-  }
 
-  return quantities;
+    Logger.log('Found ' + Object.keys(quantities).length + ' unique items in sheet');
+    return quantities;
+
+  } catch (error) {
+    Logger.log('Error getting item quantities: ' + error.message);
+    return {};
+  }
 }
 
 /**

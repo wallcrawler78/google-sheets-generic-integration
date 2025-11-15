@@ -56,6 +56,23 @@
       font-size: 14px;
     }
 
+    .favorite-star {
+      cursor: pointer;
+      font-size: 20px;
+      margin-right: 10px;
+      user-select: none;
+      opacity: 0.3;
+      transition: opacity 0.2s;
+    }
+
+    .favorite-star:hover {
+      opacity: 0.7;
+    }
+
+    .favorite-star.active {
+      opacity: 1;
+    }
+
     .color-preview {
       width: 60px;
       height: 30px;
@@ -189,12 +206,19 @@
   <script>
     var categories = [];
     var colors = {};
+    var favorites = []; // Track favorite category GUIDs
 
     // Load categories and current colors on page load
     google.script.run
       .withSuccessHandler(function(data) {
         categories = data.categories || [];
         colors = data.colors || {};
+
+        // Extract favorites from categories
+        favorites = categories
+          .filter(function(cat) { return cat.isFavorite; })
+          .map(function(cat) { return cat.guid; });
+
         renderCategories();
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('categoryList').classList.remove('hidden');
@@ -222,6 +246,29 @@
         name.className = 'category-name';
         name.textContent = cat.fullPath || cat.name;
 
+        var star = document.createElement('span');
+        star.className = 'favorite-star';
+        star.textContent = '⭐';
+        star.title = 'Toggle favorite';
+
+        // Set active state if this is a favorite
+        if (favorites.indexOf(cat.guid) !== -1) {
+          star.classList.add('active');
+        }
+
+        star.addEventListener('click', function() {
+          var index = favorites.indexOf(cat.guid);
+          if (index !== -1) {
+            // Remove from favorites
+            favorites.splice(index, 1);
+            star.classList.remove('active');
+          } else {
+            // Add to favorites
+            favorites.push(cat.guid);
+            star.classList.add('active');
+          }
+        });
+
         var colorInput = document.createElement('input');
         colorInput.type = 'color';
         colorInput.value = colors[cat.name] || colors.default || '#FFFFFF';
@@ -231,18 +278,28 @@
         });
 
         item.appendChild(name);
+        item.appendChild(star);
         item.appendChild(colorInput);
         list.appendChild(item);
       });
     }
 
     function saveColors() {
+      // Save both colors and favorites
       google.script.run
         .withSuccessHandler(function() {
-          showMessage('Category colors saved successfully!', 'success');
-          setTimeout(function() {
-            google.script.host.close();
-          }, 1500);
+          // Now save favorites
+          google.script.run
+            .withSuccessHandler(function() {
+              showMessage('Category colors and favorites saved successfully!', 'success');
+              setTimeout(function() {
+                google.script.host.close();
+              }, 1500);
+            })
+            .withFailureHandler(function(error) {
+              showMessage('Error saving favorites: ' + error.message, 'error');
+            })
+            .saveFavoriteCategories(favorites);
         })
         .withFailureHandler(function(error) {
           showMessage('Error saving colors: ' + error.message, 'error');

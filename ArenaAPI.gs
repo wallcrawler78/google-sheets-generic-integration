@@ -282,7 +282,7 @@ ArenaAPIClient.prototype.getBulkItems = function(itemIds) {
  * @return {Array<Object>} All items from the workspace
  */
 ArenaAPIClient.prototype.getAllItems = function(batchSize) {
-  batchSize = batchSize || 100;
+  batchSize = batchSize || 400; // Use max batch size (400) for better performance
 
   var allItems = [];
   var offset = 0;
@@ -292,8 +292,8 @@ ArenaAPIClient.prototype.getAllItems = function(batchSize) {
     try {
       var response = this.getItems({ limit: batchSize, offset: offset });
 
-      // Handle different possible response structures
-      var items = response.results || response.items || response.data || [];
+      // Handle different possible response structures (Arena uses capital R)
+      var items = response.results || response.Results || response.items || response.data || [];
 
       if (Array.isArray(response)) {
         items = response;

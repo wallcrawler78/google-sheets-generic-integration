@@ -349,6 +349,55 @@
       border-radius: 10px;
       font-weight: bold;
     }
+
+    .favorites-section {
+      padding: 10px 15px;
+      background: #f9f9f9;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .favorites-title {
+      font-size: 11px;
+      font-weight: bold;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .favorite-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .favorite-btn {
+      padding: 4px 10px;
+      border: 1px solid #1a73e8;
+      background: white;
+      color: #1a73e8;
+      border-radius: 12px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .favorite-btn:hover {
+      background: #e8f0fe;
+    }
+
+    .favorite-btn.active {
+      background: #1a73e8;
+      color: white;
+    }
+
+    .favorite-btn .star {
+      margin-right: 2px;
+    }
+
+    .no-favorites {
+      color: #999;
+      font-size: 11px;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -365,10 +414,21 @@
       3. Click a cell in the sheet to insert the item number
     </div>
 
+    <div class="favorites-section" id="favoritesSection">
+      <div class="favorites-title">Favorite Categories</div>
+      <div class="favorite-buttons" id="favoriteButtons">
+        <span class="no-favorites">No favorites yet. Star categories in the configuration.</span>
+      </div>
+    </div>
+
     <div class="filters">
       <div class="filter-group">
         <label class="filter-label">Category</label>
-        <select id="categoryFilter">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="categorySearch" placeholder="Search categories...">
+        </div>
+        <select id="categoryFilter" size="5" style="margin-top: 6px;">
           <option value="">All Categories</option>
         </select>
       </div>
@@ -385,7 +445,7 @@
       </div>
 
       <div class="filter-group">
-        <label class="filter-label">Search</label>
+        <label class="filter-label">Search Items</label>
         <div class="search-box">
           <span class="search-icon">🔍</span>
           <input type="text" id="searchInput" placeholder="Search item number or description...">
@@ -431,9 +491,11 @@
       google.script.run
         .withSuccessHandler(function(data) {
           categories = data.categories || [];
+          allCategories = categories; // Store for category search
           categoryColors = data.colors || {};
           allItems = data.items || [];
 
+          populateFavoriteButtons();
           populateCategoryFilter();
           applyFilters();
           loadQuantityTracker();
@@ -446,20 +508,74 @@
         .loadItemPickerData();
     }
 
-    function populateCategoryFilter() {
+    function populateFavoriteButtons() {
+      var container = document.getElementById('favoriteButtons');
+      container.innerHTML = '';
+
+      var favorites = categories.filter(function(cat) {
+        return cat.isFavorite;
+      });
+
+      if (favorites.length === 0) {
+        container.innerHTML = '<span class="no-favorites">No favorites yet. Configure favorites in Category Colors.</span>';
+        return;
+      }
+
+      favorites.forEach(function(cat) {
+        var btn = document.createElement('button');
+        btn.className = 'favorite-btn';
+        btn.innerHTML = '<span class="star">⭐</span>' + (cat.name || '');
+        btn.onclick = function() {
+          // Toggle active state
+          var buttons = container.querySelectorAll('.favorite-btn');
+          buttons.forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+
+          // Filter to this category
+          var select = document.getElementById('categoryFilter');
+          select.value = cat.guid;
+          applyFilters();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    var allCategories = []; // Store all categories for filtering
+
+    function populateCategoryFilter(searchQuery) {
       var select = document.getElementById('categoryFilter');
       select.innerHTML = '<option value="">All Categories</option>';
 
-      categories.forEach(function(cat) {
+      var query = (searchQuery || '').toLowerCase();
+
+      var filteredCategories = query ?
+        allCategories.filter(function(cat) {
+          var fullPath = cat.fullPath || cat.name || '';
+          return fullPath.toLowerCase().indexOf(query) !== -1;
+        }) :
+        allCategories;
+
+      filteredCategories.forEach(function(cat) {
         var option = document.createElement('option');
         option.value = cat.guid;
         option.textContent = cat.fullPath || cat.name;
         select.appendChild(option);
       });
+
+      // Show count of filtered categories
+      if (query && filteredCategories.length < allCategories.length) {
+        var countOption = document.createElement('option');
+        countOption.disabled = true;
+        countOption.textContent = '--- ' + filteredCategories.length + ' of ' + allCategories.length + ' categories ---';
+        select.insertBefore(countOption, select.firstChild.nextSibling);
+      }
     }
 
     // Event listeners
     document.getElementById('categoryFilter').addEventListener('change', applyFilters);
+    document.getElementById('categorySearch').addEventListener('input', function(e) {
+      populateCategoryFilter(e.target.value);
+    });
     document.getElementById('lifecycleFilter').addEventListener('change', applyFilters);
     document.getElementById('searchInput').addEventListener('input', applyFilters);
 
