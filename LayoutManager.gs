@@ -162,30 +162,6 @@ function createOverviewLayout(sheetName, rows, cols) {
   var gridRange = sheet.getRange(startRow + 1, 2, rows, cols);
   gridRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
 
-  // Add legend
-  var legendRow = startRow + rows + 2;
-  sheet.getRange(legendRow, 1).setValue('Legend:').setFontWeight('bold');
-
-  var categories = getArenaCategories();
-  var colors = getCategoryColors();
-  var legendData = [];
-
-  categories.slice(0, 5).forEach(function(cat) {
-    legendData.push([cat.name]);
-  });
-
-  if (legendData.length > 0) {
-    sheet.getRange(legendRow + 1, 1, legendData.length, 1).setValues(legendData);
-
-    // Apply colors to legend
-    categories.slice(0, 5).forEach(function(cat, index) {
-      var color = getCategoryColor(cat.name);
-      if (color) {
-        sheet.getRange(legendRow + 1 + index, 1).setBackground(color);
-      }
-    });
-  }
-
   // Freeze headers (only freeze rows, not columns due to merged title)
   sheet.setFrozenRows(startRow);
 
