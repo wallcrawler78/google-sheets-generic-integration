@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 400px;
+    }
+
+    h2 {
+      color: #1a73e8;
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 14px;
+      color: #333;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 25px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+      background-color: #1a73e8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #1557b0;
+    }
+
+    .btn-primary:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background-color: #f1f3f4;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background-color: #e8eaed;
+    }
+
+    .message {
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    .message.success {
+      background-color: #e6f4ea;
+      color: #137333;
+      border: 1px solid #81c995;
+    }
+
+    .message.error {
+      background-color: #fce8e6;
+      color: #c5221f;
+      border: 1px solid #f28b82;
+    }
+
+    .message.info {
+      background-color: #e8f0fe;
+      color: #1967d2;
+      border: 1px solid #8ab4f8;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .required {
+      color: #c5221f;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Configure Arena API Connection</h2>
+
+    <div id="message" class="message hidden"></div>
+
+    <form id="credentialsForm">
+      <div class="form-group">
+        <label for="apiEndpoint">
+          API Endpoint <span class="required">*</span>
+        </label>
+        <input
+          type="text"
+          id="apiEndpoint"
+          name="apiEndpoint"
+          placeholder="https://api.arenasolutions.com"
+          required
+        />
+        <div class="help-text">The base URL for your Arena API instance</div>
+      </div>
+
+      <div class="form-group">
+        <label for="workspaceId">
+          Workspace ID <span class="required">*</span>
+        </label>
+        <input
+          type="text"
+          id="workspaceId"
+          name="workspaceId"
+          placeholder="e.g., 12345"
+          required
+        />
+        <div class="help-text">Your Arena workspace identifier</div>
+      </div>
+
+      <div class="form-group">
+        <label for="apiKey">
+          API Key <span class="required">*</span>
+        </label>
+        <input
+          type="password"
+          id="apiKey"
+          name="apiKey"
+          placeholder="Enter your API key"
+          required
+        />
+        <div class="help-text">Your Arena API authentication key</div>
+      </div>
+
+      <div class="button-group">
+        <button type="submit" class="btn-primary" id="saveButton">
+          Save & Test Connection
+        </button>
+        <button type="button" class="btn-secondary" onclick="google.script.host.close()">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Load existing credentials on page load
+    google.script.run
+      .withSuccessHandler(populateForm)
+      .withFailureHandler(handleError)
+      .getAuthorizationStatus();
+
+    function populateForm(status) {
+      if (status.isConfigured) {
+        document.getElementById('apiEndpoint').value = status.apiEndpoint || '';
+        document.getElementById('workspaceId').value = status.workspaceId || '';
+        showMessage('Current configuration loaded. Update fields as needed.', 'info');
+      }
+    }
+
+    // Handle form submission
+    document.getElementById('credentialsForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      var apiEndpoint = document.getElementById('apiEndpoint').value.trim();
+      var workspaceId = document.getElementById('workspaceId').value.trim();
+      var apiKey = document.getElementById('apiKey').value.trim();
+
+      // Validate inputs
+      if (!apiEndpoint || !workspaceId || !apiKey) {
+        showMessage('Please fill in all required fields.', 'error');
+        return;
+      }
+
+      // Validate API endpoint format
+      if (!apiEndpoint.startsWith('http://') && !apiEndpoint.startsWith('https://')) {
+        showMessage('API Endpoint must start with http:// or https://', 'error');
+        return;
+      }
+
+      // Disable button while saving
+      var saveButton = document.getElementById('saveButton');
+      saveButton.disabled = true;
+      saveButton.textContent = 'Saving...';
+
+      var credentials = {
+        apiEndpoint: apiEndpoint,
+        apiKey: apiKey,
+        workspaceId: workspaceId
+      };
+
+      // Save credentials
+      google.script.run
+        .withSuccessHandler(handleSaveSuccess)
+        .withFailureHandler(handleSaveError)
+        .saveArenaCredentials(credentials);
+    });
+
+    function handleSaveSuccess(result) {
+      var saveButton = document.getElementById('saveButton');
+
+      if (result.success) {
+        showMessage('Configuration saved successfully! Testing connection...', 'success');
+
+        // Test the connection
+        google.script.run
+          .withSuccessHandler(handleTestSuccess)
+          .withFailureHandler(handleTestError)
+          .testArenaConnection();
+      } else {
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save & Test Connection';
+        showMessage('Error: ' + result.error, 'error');
+      }
+    }
+
+    function handleSaveError(error) {
+      var saveButton = document.getElementById('saveButton');
+      saveButton.disabled = false;
+      saveButton.textContent = 'Save & Test Connection';
+      showMessage('Failed to save credentials: ' + error.message, 'error');
+    }
+
+    function handleTestSuccess(result) {
+      var saveButton = document.getElementById('saveButton');
+      saveButton.disabled = false;
+      saveButton.textContent = 'Save & Test Connection';
+
+      if (result.success) {
+        showMessage('Success! Connection to Arena API verified. You can now close this window.', 'success');
+
+        // Auto-close after 2 seconds
+        setTimeout(function() {
+          google.script.host.close();
+        }, 2000);
+      } else {
+        showMessage('Configuration saved, but connection test failed: ' + result.error, 'error');
+      }
+    }
+
+    function handleTestError(error) {
+      var saveButton = document.getElementById('saveButton');
+      saveButton.disabled = false;
+      saveButton.textContent = 'Save & Test Connection';
+      showMessage('Configuration saved, but connection test failed: ' + error.message, 'error');
+    }
+
+    function handleError(error) {
+      showMessage('Error: ' + error.message, 'error');
+    }
+
+    function showMessage(text, type) {
+      var messageDiv = document.getElementById('message');
+      messageDiv.textContent = text;
+      messageDiv.className = 'message ' + type;
+      messageDiv.classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
