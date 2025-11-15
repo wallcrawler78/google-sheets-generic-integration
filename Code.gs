@@ -413,14 +413,28 @@ function showCategorySelector(title, subtitle) {
 
   SpreadsheetApp.getUi().showModalDialog(html, title);
 
-  // Wait for selection (will be set by setCategorySelection)
-  var selection = PropertiesService.getUserProperties().getProperty('category_selection');
+  // Poll for selection with timeout
+  // NOTE: This is a workaround for Apps Script's lack of true blocking dialogs
+  // The dialog is shown asynchronously, so we poll every second for up to 5 minutes
+  var maxAttempts = 300; // 5 minutes (300 seconds)
+  var attempts = 0;
+  var selection = null;
 
-  if (selection) {
-    return JSON.parse(selection);
-  } else {
-    return null;
+  while (attempts < maxAttempts) {
+    Utilities.sleep(1000); // Wait 1 second
+    selection = PropertiesService.getUserProperties().getProperty('category_selection');
+
+    if (selection) {
+      Logger.log('Category selected after ' + attempts + ' seconds');
+      return JSON.parse(selection);
+    }
+
+    attempts++;
   }
+
+  // Timeout - user didn't make a selection
+  Logger.log('Category selection timed out after ' + maxAttempts + ' seconds');
+  return null;
 }
 
 /**
@@ -429,15 +443,17 @@ function showCategorySelector(title, subtitle) {
  */
 function getCategorySelectorData() {
   var categories = getArenaCategories();
-  var favorites = getFavoriteCategories();
+  var favoriteGuids = getFavoriteCategories();  // This returns category GUIDs
 
-  // Get favorite category objects
+  // Get favorite category objects by matching GUIDs
   var favoriteCategoryObjects = [];
-  if (favorites && favorites.length > 0) {
+  if (favoriteGuids && favoriteGuids.length > 0) {
     favoriteCategoryObjects = categories.filter(function(cat) {
-      return favorites.indexOf(cat.name) !== -1;
+      return favoriteGuids.indexOf(cat.guid) !== -1;
     });
   }
+
+  Logger.log('Found ' + favoriteCategoryObjects.length + ' favorite categories out of ' + categories.length + ' total');
 
   return {
     categories: categories,
