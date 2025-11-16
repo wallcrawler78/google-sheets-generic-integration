@@ -142,6 +142,7 @@
       flex: 1;
       overflow-y: auto;
       padding: 10px;
+      padding-bottom: 70px;  /* Space for fixed button */
     }
 
     .item-card {
@@ -301,6 +302,7 @@
       flex: 1;
       overflow-y: auto;
       padding: 10px 15px;
+      padding-bottom: 70px;  /* Space for fixed button */
     }
 
     .quantity-item {
@@ -369,30 +371,30 @@
     }
 
     .insert-button {
-      width: 100%;
-      padding: 12px 20px;
-      background: linear-gradient(135deg, #34a853 0%, #2d8e47 100%);
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #1a73e8 0%, #174ea6 100%);
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 4px;
       font-size: 14px;
-      font-weight: bold;
+      font-weight: 500;
       cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
       transition: all 0.2s;
-      margin: 10px 15px;
-      width: calc(100% - 30px);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
     .insert-button:hover:not(:disabled) {
-      background: linear-gradient(135deg, #2d8e47 0%, #34a853 100%);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
       transform: translateY(-1px);
     }
 
     .insert-button:active:not(:disabled) {
       transform: translateY(0);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
     .insert-button:disabled {
@@ -400,6 +402,7 @@
       color: #999;
       cursor: not-allowed;
       box-shadow: none;
+      transform: none;
     }
   </style>
 </head>
@@ -431,10 +434,6 @@
       <div class="item-count" id="itemCount">
         <strong>0</strong> items found
       </div>
-
-      <button class="insert-button" id="insertButton" onclick="insertItem()" disabled>
-        📍 Insert Selected Item
-      </button>
 
       <div id="itemsLoading" class="loading hidden">
         <div class="spinner"></div>
@@ -530,6 +529,10 @@
         </div>
       </div>
     </div>
+
+    <button class="insert-button" id="insertButton" onclick="insertItem()" disabled>
+      Insert Item in Selected Cell
+    </button>
   </div>
 
   <script>
