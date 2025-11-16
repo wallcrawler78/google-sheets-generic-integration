@@ -1314,35 +1314,21 @@ function createCustomRackItems(customRacks) {
       return { success: false, message: 'Invalid rack name' };
     }
 
-    // Prompt for category (get favorite categories)
-    var categories = getArenaCategories();
-    var favoriteCategories = getFavoriteCategories();
-    var categoryList = favoriteCategories.length > 0 ? favoriteCategories : categories.slice(0, 10);
+    // Use clickable category selector dialog
+    Logger.log('Prompting user to select category for rack: ' + rack.itemNumber);
 
-    var categoryPrompt = 'RACK: ' + rack.itemNumber + ' - Select Category\n\n' +
-                         'Available categories:\n';
-    categoryList.forEach(function(cat, idx) {
-      categoryPrompt += '  ' + (idx + 1) + '. ' + cat + '\n';
-    });
-    categoryPrompt += '\n----------------------------------------\n';
-    categoryPrompt += 'Enter category number or name:';
+    var categorySelection = showCategorySelector(
+      'Select Category for Rack ' + rack.itemNumber,
+      'Choose the Arena category for this custom rack item (' + (i + 1) + ' of ' + customRacks.length + ')'
+    );
 
-    var categoryResponse = ui.prompt('Select Category for Rack ' + rack.itemNumber, categoryPrompt, ui.ButtonSet.OK_CANCEL);
-
-    if (categoryResponse.getSelectedButton() !== ui.Button.OK) {
+    if (!categorySelection) {
+      ui.alert('Error', 'Category selection cancelled. Cannot proceed with POD creation.', ui.ButtonSet.OK);
       return { success: false, message: 'Cancelled by user' };
     }
 
-    var categoryInput = categoryResponse.getResponseText().trim();
-    var selectedCategory = '';
-
-    // Check if input is a number (index)
-    var catIndex = parseInt(categoryInput, 10);
-    if (!isNaN(catIndex) && catIndex > 0 && catIndex <= categoryList.length) {
-      selectedCategory = categoryList[catIndex - 1];
-    } else {
-      selectedCategory = categoryInput;
-    }
+    var selectedCategoryName = categorySelection.name;
+    Logger.log('Selected category: ' + selectedCategoryName + ' (GUID: ' + categorySelection.guid + ')');
 
     // Prompt for description
     var descResponse = ui.prompt(
@@ -1360,10 +1346,12 @@ function createCustomRackItems(customRacks) {
 
     // Create the item in Arena
     try {
+      Logger.log('Creating rack item: ' + rack.itemNumber + ' with category: ' + selectedCategoryName);
+
       var newItem = client.createItem({
         number: rack.itemNumber,
         name: rackName,
-        category: selectedCategory,
+        category: selectedCategoryName,
         description: description
       });
 
