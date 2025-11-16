@@ -1002,9 +1002,10 @@ function insertItemIntoRackConfig(sheet, row, item) {
   Logger.log('Item name: ' + item.name);
   Logger.log('Item description: ' + item.description);
   Logger.log('Item categoryName: ' + item.categoryName);
+  Logger.log('Item lifecyclePhase: ' + item.lifecyclePhase);
   Logger.log('Item attributes: ' + (item.attributes ? item.attributes.length : 'none'));
 
-  // Column structure: Item Number | Name | Description | Category | Qty | ...attributes
+  // Column structure: Item Number | Name | Description | Category | Lifecycle | Qty | ...attributes
   var col = 1;
 
   // Item Number
@@ -1022,6 +1023,10 @@ function insertItemIntoRackConfig(sheet, row, item) {
   // Category
   Logger.log('Setting category in column ' + col);
   sheet.getRange(row, col++).setValue(item.categoryName || '');
+
+  // Lifecycle
+  Logger.log('Setting lifecycle in column ' + col);
+  sheet.getRange(row, col++).setValue(item.lifecyclePhase || '');
 
   // Qty (default to 1)
   Logger.log('Setting quantity in column ' + col);
@@ -1207,7 +1212,7 @@ function createRackConfigFromArenaItem(arenaItem) {
 
   // Set up header row (Row 2)
   var itemColumns = getItemColumns();
-  var headers = ['Item Number', 'Name', 'Description', 'Category', 'Qty'];
+  var headers = ['Item Number', 'Name', 'Description', 'Category', 'Lifecycle', 'Qty'];
 
   // Add configured attribute columns
   itemColumns.forEach(function(col) {
@@ -1229,7 +1234,8 @@ function createRackConfigFromArenaItem(arenaItem) {
   newSheet.setColumnWidth(2, 200);  // Name
   newSheet.setColumnWidth(3, 300);  // Description
   newSheet.setColumnWidth(4, 150);  // Category
-  newSheet.setColumnWidth(5, 60);   // Qty
+  newSheet.setColumnWidth(5, 120);  // Lifecycle
+  newSheet.setColumnWidth(6, 60);   // Qty
 
   // Try to pull BOM from Arena and populate the sheet
   try {
@@ -1333,6 +1339,9 @@ function pullBOMForRack(sheet, itemNumber, itemGuid) {
     var categoryObj = bomItem.category || bomItem.Category || {};
     var categoryName = categoryObj.name || categoryObj.Name || '';
 
+    var lifecycleObj = bomItem.lifecyclePhase || bomItem.LifecyclePhase || {};
+    var lifecycleName = lifecycleObj.name || lifecycleObj.Name || '';
+
     // If description or category is missing, we may need to fetch full item details
     if (!bomItemDesc || !categoryName) {
       var bomItemGuid = bomItem.guid || bomItem.Guid;
@@ -1346,6 +1355,9 @@ function pullBOMForRack(sheet, itemNumber, itemGuid) {
 
             var fullCategoryObj = fullItem.category || fullItem.Category || {};
             categoryName = categoryName || fullCategoryObj.name || fullCategoryObj.Name || '';
+
+            var fullLifecycleObj = fullItem.lifecyclePhase || fullItem.LifecyclePhase || {};
+            lifecycleName = lifecycleName || fullLifecycleObj.name || fullLifecycleObj.Name || '';
           }
         } catch (itemError) {
           Logger.log('pullBOMForRack: Could not fetch full details for ' + bomItemNumber + ': ' + itemError.message);
@@ -1358,13 +1370,14 @@ function pullBOMForRack(sheet, itemNumber, itemGuid) {
       bomItemName,
       bomItemDesc,
       categoryName,
+      lifecycleName,
       quantity
     ]);
   });
 
   // Write BOM data to sheet (starting at row 3)
   if (rowData.length > 0) {
-    sheet.getRange(3, 1, rowData.length, 5).setValues(rowData);
+    sheet.getRange(3, 1, rowData.length, 6).setValues(rowData);
 
     // Apply category colors to each row
     for (var i = 0; i < rowData.length; i++) {

@@ -146,7 +146,7 @@ function createNewRackConfiguration() {
 
   // Step 6: Set up header row (Row 2)
   var itemColumns = getItemColumns();
-  var headers = ['Item Number', 'Name', 'Description', 'Category', 'Qty'];
+  var headers = ['Item Number', 'Name', 'Description', 'Category', 'Lifecycle', 'Qty'];
 
   // Add configured attribute columns
   itemColumns.forEach(function(col) {
@@ -168,7 +168,8 @@ function createNewRackConfiguration() {
   newSheet.setColumnWidth(2, 200);  // Name
   newSheet.setColumnWidth(3, 300);  // Description
   newSheet.setColumnWidth(4, 150);  // Category
-  newSheet.setColumnWidth(5, 60);   // Qty
+  newSheet.setColumnWidth(5, 120);  // Lifecycle
+  newSheet.setColumnWidth(6, 60);   // Qty
 
   // Step 9: Add instructions in Row 3
   newSheet.getRange(DATA_START_ROW, 1).setValue('Use Item Picker to add components →');
