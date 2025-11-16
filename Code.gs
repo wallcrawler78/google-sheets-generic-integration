@@ -47,21 +47,11 @@ function onOpen(e) {
 
 /**
  * Runs when a cell is edited
- * Used to trigger item insertion when user clicks a cell after selecting an item
+ * NOTE: Auto-insertion disabled - users must click the "Insert Item" button in the Item Picker
  */
 function onSelectionChange(e) {
-  var selectedItem = getSelectedItem();
-
-  if (selectedItem) {
-    // User has an item selected from the picker and clicked a cell
-    // Show a prompt to insert the item
-    var sheet = SpreadsheetApp.getActiveSheet();
-    var cell = sheet.getActiveCell();
-
-    if (cell) {
-      insertSelectedItem();
-    }
-  }
+  // Auto-insertion disabled to prevent unwanted insertions
+  // Users should use the "Insert Item in Selected Cell" button in the Item Picker sidebar
 }
 
 /**
@@ -658,11 +648,20 @@ function setSelectedItem(item) {
  */
 function getSelectedItem() {
   var json = PropertiesService.getUserProperties().getProperty('SELECTED_ITEM');
-  if (!json) return null;
+  if (!json) {
+    Logger.log('getSelectedItem: No item in storage');
+    return null;
+  }
 
   try {
-    return JSON.parse(json);
+    var item = JSON.parse(json);
+    Logger.log('getSelectedItem: Retrieved item: ' + item.number);
+    Logger.log('getSelectedItem: Item has name: ' + (item.name ? 'YES' : 'NO'));
+    Logger.log('getSelectedItem: Item has description: ' + (item.description ? 'YES' : 'NO'));
+    Logger.log('getSelectedItem: Item has categoryName: ' + (item.categoryName ? 'YES' : 'NO'));
+    return item;
   } catch (e) {
+    Logger.log('getSelectedItem: Error parsing JSON: ' + e.message);
     return null;
   }
 }
@@ -990,7 +989,12 @@ function insertItemIntoRackConfig(sheet, row, item) {
   Logger.log('=== INSERT ITEM INTO RACK CONFIG ===');
   Logger.log('Sheet: ' + sheet.getName());
   Logger.log('Row: ' + row);
-  Logger.log('Item: ' + item.number);
+  Logger.log('Item object: ' + JSON.stringify(item));
+  Logger.log('Item number: ' + item.number);
+  Logger.log('Item name: ' + item.name);
+  Logger.log('Item description: ' + item.description);
+  Logger.log('Item categoryName: ' + item.categoryName);
+  Logger.log('Item attributes: ' + (item.attributes ? item.attributes.length : 'none'));
 
   // Column structure: Item Number | Name | Description | Category | Qty | ...attributes
   var col = 1;
@@ -1234,6 +1238,11 @@ function createRackConfigFromArenaItem(arenaItem) {
     newSheet.getRange(4, 1).setValue('→ Use Item Picker to manually add components');
     newSheet.getRange(4, 1, 1, headers.length).setFontStyle('italic').setFontColor('#666666');
   }
+
+  // Set tab color to cascading blue
+  var rackIndex = getAllRackConfigTabs().length;  // Get count including this new one
+  var blueColor = getCascadingBlueColor(rackIndex - 1);  // Subtract 1 for zero-based index
+  newSheet.setTabColor(blueColor);
 
   Logger.log('Rack config sheet created: ' + sheetName);
   return newSheet;
