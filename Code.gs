@@ -588,6 +588,14 @@ function loadItemPickerData() {
       var categoryObj = item.category || item.Category || {};
       var lifecycleObj = item.lifecyclePhase || item.LifecyclePhase || {};
 
+      // Log first item's raw structure to understand Arena's field names
+      if (rawItems.indexOf(item) === 0) {
+        Logger.log('RAW ARENA ITEM STRUCTURE:');
+        Logger.log('Available fields: ' + Object.keys(item).join(', '));
+        Logger.log('description field: ' + (item.description || item.Description || 'NOT FOUND'));
+        Logger.log('Full item object: ' + JSON.stringify(item));
+      }
+
       return {
         guid: item.guid || item.Guid,
         number: item.number || item.Number || '',
