@@ -165,6 +165,9 @@ function createOverviewLayout(sheetName, rows, cols) {
   // Freeze headers (only freeze rows, not columns due to merged title)
   sheet.setFrozenRows(startRow);
 
+  // Set tab color to green
+  sheet.setTabColor('#4caf50');
+
   return sheet;
 }
 

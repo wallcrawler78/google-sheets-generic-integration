@@ -174,7 +174,12 @@ function createNewRackConfiguration() {
   newSheet.getRange(DATA_START_ROW, 1).setValue('Use Item Picker to add components →');
   newSheet.getRange(DATA_START_ROW, 1, 1, headers.length).setFontStyle('italic').setFontColor('#666666');
 
-  // Step 10: Activate the new sheet
+  // Step 10: Set tab color to cascading blue
+  var rackIndex = getAllRackConfigTabs().length;  // Get count including this new one
+  var blueColor = getCascadingBlueColor(rackIndex - 1);  // Subtract 1 for zero-based index
+  newSheet.setTabColor(blueColor);
+
+  // Step 11: Activate the new sheet
   newSheet.activate();
 
   ui.alert(
@@ -198,9 +203,16 @@ function getRackConfigMetadata(sheet) {
   try {
     var label = sheet.getRange(METADATA_ROW, META_LABEL_COL).getValue();
 
+    Logger.log('getRackConfigMetadata: Checking sheet "' + sheet.getName() + '"');
+    Logger.log('getRackConfigMetadata: Cell A1 value = "' + label + '"');
+    Logger.log('getRackConfigMetadata: Expected value = "PARENT_ITEM"');
+
     if (label !== 'PARENT_ITEM') {
+      Logger.log('getRackConfigMetadata: NOT a rack config sheet (metadata label mismatch)');
       return null;  // Not a rack config sheet
     }
+
+    Logger.log('getRackConfigMetadata: IS a rack config sheet!');
 
     return {
       itemNumber: sheet.getRange(METADATA_ROW, META_ITEM_NUM_COL).getValue(),
@@ -222,6 +234,90 @@ function getRackConfigMetadata(sheet) {
  */
 function isRackConfigSheet(sheet) {
   return getRackConfigMetadata(sheet) !== null;
+}
+
+/**
+ * Repairs a rack sheet by adding missing metadata row
+ * Use this if you have an existing rack sheet that's not being recognized
+ */
+function repairRackSheetMetadata() {
+  var ui = SpreadsheetApp.getUi();
+  var sheet = SpreadsheetApp.getActiveSheet();
+
+  Logger.log('=== REPAIR RACK SHEET METADATA ===');
+  Logger.log('Sheet name: ' + sheet.getName());
+
+  // Check if already a rack config
+  if (isRackConfigSheet(sheet)) {
+    ui.alert('Already Valid', 'This sheet already has valid rack configuration metadata!', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Prompt for rack item number
+  var itemResponse = ui.prompt(
+    'Repair Rack Sheet',
+    'Enter the parent rack item number (e.g., "RACK-001"):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (itemResponse.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  var itemNumber = itemResponse.getResponseText().trim();
+  if (!itemNumber) {
+    ui.alert('Error', 'Item number is required', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Prompt for rack name
+  var nameResponse = ui.prompt(
+    'Repair Rack Sheet',
+    'Enter the rack name (e.g., "Hyperscale Compute Rack"):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (nameResponse.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  var itemName = nameResponse.getResponseText().trim();
+  if (!itemName) {
+    ui.alert('Error', 'Rack name is required', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Insert a row at the top
+  sheet.insertRowBefore(1);
+
+  // Set metadata in Row 1
+  sheet.getRange(1, 1).setValue('PARENT_ITEM');
+  sheet.getRange(1, 2).setValue(itemNumber);
+  sheet.getRange(1, 3).setValue(itemName);
+  sheet.getRange(1, 4).setValue('Rack configuration for ' + itemName);
+
+  // Format metadata row
+  var metaRange = sheet.getRange(1, 1, 1, 4);
+  metaRange.setBackground('#e8f0fe');
+  metaRange.setFontWeight('bold');
+  metaRange.setFontColor('#1967d2');
+
+  // Ensure Row 2 is the header row (should already be there)
+  // Freeze rows 1 and 2
+  sheet.setFrozenRows(2);
+
+  Logger.log('Metadata row added to sheet: ' + sheet.getName());
+  Logger.log('Item number: ' + itemNumber);
+  Logger.log('Item name: ' + itemName);
+
+  ui.alert(
+    'Repair Complete',
+    'Rack sheet metadata has been added!\n\n' +
+    'Sheet: "' + sheet.getName() + '"\n' +
+    'Parent Item: ' + itemNumber + '\n\n' +
+    'You can now use the Item Picker to add components with full details.',
+    ui.ButtonSet.OK
+  );
 }
 
 /**
@@ -381,4 +477,27 @@ function validateRackConfigurations() {
   });
 
   return warnings;
+}
+
+/**
+ * Gets a cascading blue color for rack tabs
+ * Returns different shades of blue based on index
+ * @param {number} index - Zero-based index of the rack
+ * @return {string} Hex color code
+ */
+function getCascadingBlueColor(index) {
+  // Array of blue shades from darker to lighter
+  var blueShades = [
+    '#0d47a1', // Dark blue
+    '#1565c0', // Medium dark blue
+    '#1976d2', // Medium blue
+    '#1e88e5', // Medium light blue
+    '#2196f3', // Light blue
+    '#42a5f5', // Lighter blue
+    '#64b5f6', // Very light blue
+    '#90caf9'  // Lightest blue
+  ];
+
+  // Cycle through colors if we have more racks than colors
+  return blueShades[index % blueShades.length];
 }
