@@ -325,6 +325,49 @@ function syncBOMToArena(client, parentGuid, bomLines, options) {
   options = options || {};
   var bomAttributes = options.bomAttributes || {};
 
+  // Input validation - fail fast if critical data is missing
+  if (!client) {
+    throw new Error('syncBOMToArena: ArenaAPIClient is required');
+  }
+  if (!parentGuid) {
+    throw new Error('syncBOMToArena: Parent item GUID is required');
+  }
+  if (!bomLines || !Array.isArray(bomLines)) {
+    throw new Error('syncBOMToArena: bomLines must be an array');
+  }
+
+  // Validate all BOM lines have required fields before proceeding
+  Logger.log('Validating ' + bomLines.length + ' BOM lines before sync...');
+  var validationErrors = [];
+
+  for (var i = 0; i < bomLines.length; i++) {
+    var line = bomLines[i];
+    var lineRef = 'BOM line ' + (i + 1) + ' (' + (line.itemNumber || 'unknown') + ')';
+
+    if (!line.itemNumber) {
+      validationErrors.push(lineRef + ': missing itemNumber');
+    }
+    if (!line.itemGuid) {
+      validationErrors.push(lineRef + ': missing itemGuid');
+    }
+    if (typeof line.quantity === 'undefined' || line.quantity === null) {
+      validationErrors.push(lineRef + ': missing quantity');
+    }
+    if (typeof line.level === 'undefined' || line.level === null) {
+      validationErrors.push(lineRef + ': missing level');
+    }
+  }
+
+  // If any validation errors, fail immediately with comprehensive error message
+  if (validationErrors.length > 0) {
+    var errorMsg = 'syncBOMToArena: BOM validation failed with ' + validationErrors.length + ' error(s):\n' +
+                   validationErrors.join('\n');
+    Logger.log('ERROR: ' + errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  Logger.log('✓ All BOM lines validated successfully');
+
   // First, get existing BOM lines for this item
   var existingBOM = [];
   try {
@@ -353,12 +396,7 @@ function syncBOMToArena(client, parentGuid, bomLines, options) {
 
   bomLines.forEach(function(line, index) {
     try {
-      // Use the itemGuid that was passed in (no longer searching)
-      if (!line.itemGuid) {
-        Logger.log('Error: BOM line missing itemGuid for ' + line.itemNumber);
-        return;
-      }
-
+      // All validation done at start - safe to proceed
       // Create BOM line
       var bomLineData = {
         item: {
@@ -382,13 +420,15 @@ function syncBOMToArena(client, parentGuid, bomLines, options) {
         payload: bomLineData
       });
 
-      Logger.log('Added BOM line ' + (index + 1) + ': ' + line.itemNumber + ' (GUID: ' + line.itemGuid + ')');
+      Logger.log('✓ Added BOM line ' + (index + 1) + ': ' + line.itemNumber + ' (GUID: ' + line.itemGuid + ')');
 
       // Add delay to avoid rate limiting
       Utilities.sleep(100);
 
     } catch (error) {
-      Logger.log('Error adding BOM line for ' + line.itemNumber + ': ' + error.message);
+      var errorMsg = 'Failed to add BOM line ' + (index + 1) + ' (' + line.itemNumber + '): ' + error.message;
+      Logger.log('ERROR: ' + errorMsg);
+      throw new Error(errorMsg);  // Fail loudly - don't continue with incomplete BOM
     }
   });
 }
@@ -1224,14 +1264,36 @@ function createCustomRackItems(customRacks) {
       var children = getRackConfigChildren(rack.sheet);
       var itemGuid = rack.arenaItem.guid || rack.arenaItem.Guid;
 
-      // Convert children to BOM format
-      var bomLines = children.map(function(child, index) {
-        return {
-          itemNumber: child.itemNumber,
-          quantity: child.quantity || 1,
-          level: 0
-        };
-      });
+      // Convert children to BOM format with GUID lookups
+      var bomLines = [];
+      for (var j = 0; j < children.length; j++) {
+        var child = children[j];
+        try {
+          Logger.log('Looking up GUID for child component: ' + child.itemNumber);
+          var childItem = client.getItemByNumber(child.itemNumber);
+
+          if (!childItem) {
+            Logger.log('ERROR: Child component not found in Arena: ' + child.itemNumber);
+            throw new Error('Child component not found in Arena: ' + child.itemNumber +
+                          '. Needed for rack: ' + rack.itemNumber +
+                          '. Please ensure all components exist in Arena before creating rack BOMs.');
+          }
+
+          var childGuid = childItem.guid || childItem.Guid;
+
+          bomLines.push({
+            itemNumber: child.itemNumber,
+            itemGuid: childGuid,  // ✓ Include GUID from Arena lookup
+            quantity: child.quantity || 1,
+            level: 0
+          });
+
+          Logger.log('✓ Found child component GUID: ' + child.itemNumber + ' → ' + childGuid);
+        } catch (childError) {
+          Logger.log('ERROR looking up child component ' + child.itemNumber + ': ' + childError.message);
+          throw childError;  // Fail loudly - don't create incomplete BOMs
+        }
+      }
 
       syncBOMToArena(client, itemGuid, bomLines);
 
@@ -1325,13 +1387,36 @@ function createCustomRackItems(customRacks) {
       // Get rack children and push BOM
       var children = getRackConfigChildren(rack.sheet);
 
-      var bomLines = children.map(function(child) {
-        return {
-          itemNumber: child.itemNumber,
-          quantity: child.quantity || 1,
-          level: 0
-        };
-      });
+      // Convert children to BOM format with GUID lookups
+      var bomLines = [];
+      for (var k = 0; k < children.length; k++) {
+        var child = children[k];
+        try {
+          Logger.log('Looking up GUID for child component: ' + child.itemNumber);
+          var childItem = client.getItemByNumber(child.itemNumber);
+
+          if (!childItem) {
+            Logger.log('ERROR: Child component not found in Arena: ' + child.itemNumber);
+            throw new Error('Child component not found in Arena: ' + child.itemNumber +
+                          '. Needed for rack: ' + rack.itemNumber +
+                          '. Please ensure all components exist in Arena before creating rack BOMs.');
+          }
+
+          var childGuid = childItem.guid || childItem.Guid;
+
+          bomLines.push({
+            itemNumber: child.itemNumber,
+            itemGuid: childGuid,  // ✓ Include GUID from Arena lookup
+            quantity: child.quantity || 1,
+            level: 0
+          });
+
+          Logger.log('✓ Found child component GUID: ' + child.itemNumber + ' → ' + childGuid);
+        } catch (childError) {
+          Logger.log('ERROR looking up child component ' + child.itemNumber + ': ' + childError.message);
+          throw childError;  // Fail loudly - don't create incomplete BOMs
+        }
+      }
 
       syncBOMToArena(client, newItemGuid, bomLines);
 
