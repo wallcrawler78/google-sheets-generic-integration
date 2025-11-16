@@ -92,7 +92,24 @@ function testArenaConnection() {
     var result = arenaClient.testConnection();
 
     if (result.success) {
-      ui.alert('Success', 'Connection to Arena API successful!\n\nWorkspace: ' + getWorkspaceId(), ui.ButtonSet.OK);
+      // Fun welcome messages - pick one at random
+      var welcomeMessages = [
+        'Welcome to the Arena Data Center!',
+        'Connection successful! Ready to manage your data!',
+        'All systems go! Your Arena is ready!',
+        'Connected! Time to build something awesome!',
+        'Success! Your data center awaits!',
+        'Arena connection established! Let\'s get to work!'
+      ];
+      var randomWelcome = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+
+      var message = randomWelcome + '\n\n' +
+                   'Workspace: ' + getWorkspaceId() + '\n' +
+                   'Total Items: ' + result.totalItems + '\n' +
+                   'Categories: ' + result.categoryCount + '\n\n' +
+                   'Ready to create rack configurations and BOMs!';
+
+      ui.alert('Connection Successful', message, ui.ButtonSet.OK);
     } else {
       ui.alert('Connection Failed', 'Could not connect to Arena API:\n' + result.error, ui.ButtonSet.OK);
     }
@@ -624,7 +641,15 @@ function loadItemPickerData() {
  * @param {Object} item - Selected item data
  */
 function setSelectedItem(item) {
+  Logger.log('=== SET SELECTED ITEM ===');
+  Logger.log('Item: ' + JSON.stringify(item));
+  Logger.log('Item Number: ' + (item ? item.number : 'null'));
+  Logger.log('Item Name: ' + (item ? item.name : 'null'));
+  Logger.log('Item GUID: ' + (item ? item.guid : 'null'));
+
   PropertiesService.getUserProperties().setProperty('SELECTED_ITEM', JSON.stringify(item));
+  Logger.log('Item stored in user properties');
+  Logger.log('=== SET SELECTED ITEM COMPLETE ===');
 }
 
 /**
@@ -895,33 +920,47 @@ function getRackQuantitiesWithScope(scope) {
  * Called when user clicks a cell after selecting an item
  */
 function insertSelectedItem() {
+  Logger.log('=== INSERT SELECTED ITEM ===');
+
   var selectedItem = getSelectedItem();
   if (!selectedItem) {
+    Logger.log('ERROR: No item selected');
     SpreadsheetApp.getUi().alert('No Item Selected', 'Please select an item from the Item Picker first.', SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
+
+  Logger.log('Selected item: ' + selectedItem.number);
 
   var sheet = SpreadsheetApp.getActiveSheet();
   var cell = sheet.getActiveCell();
 
   if (!cell) {
+    Logger.log('ERROR: No cell selected');
     SpreadsheetApp.getUi().alert('No Cell Selected', 'Please select a cell to insert the item.', SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
 
+  Logger.log('Target sheet: ' + sheet.getName());
+  Logger.log('Target cell: ' + cell.getA1Notation());
+
   // Check if this is a rack config sheet
   var isRackConfig = isRackConfigSheet(sheet);
+  Logger.log('Is rack config sheet: ' + isRackConfig);
 
   if (isRackConfig) {
     // Insert into rack config sheet (full row with attributes + qty)
+    Logger.log('Inserting into rack config at row ' + cell.getRow());
     insertItemIntoRackConfig(sheet, cell.getRow(), selectedItem);
+    Logger.log('Rack config insertion complete');
   } else {
     // Insert into regular sheet (item number only, with potential hyperlink)
+    Logger.log('Inserting into regular sheet');
     cell.setValue(selectedItem.number);
 
     // Apply category color
     var categoryColor = getCategoryColor(selectedItem.categoryName);
     if (categoryColor) {
+      Logger.log('Applying category color: ' + categoryColor);
       cell.setBackground(categoryColor);
     }
 
@@ -930,12 +969,15 @@ function insertSelectedItem() {
     if (rackConfigSheet) {
       var sheetId = rackConfigSheet.getSheetId();
       var formula = '=HYPERLINK("#gid=' + sheetId + '", "' + selectedItem.number + '")';
+      Logger.log('Creating hyperlink formula: ' + formula);
       cell.setFormula(formula);
     }
   }
 
   // Clear selection
+  Logger.log('Clearing selected item');
   clearSelectedItem();
+  Logger.log('=== INSERT SELECTED ITEM COMPLETE ===');
 }
 
 /**
@@ -945,29 +987,41 @@ function insertSelectedItem() {
  * @param {Object} item - Item data
  */
 function insertItemIntoRackConfig(sheet, row, item) {
+  Logger.log('=== INSERT ITEM INTO RACK CONFIG ===');
+  Logger.log('Sheet: ' + sheet.getName());
+  Logger.log('Row: ' + row);
+  Logger.log('Item: ' + item.number);
+
   // Column structure: Item Number | Name | Description | Category | Qty | ...attributes
   var col = 1;
 
   // Item Number
+  Logger.log('Setting item number in column ' + col);
   sheet.getRange(row, col++).setValue(item.number);
 
   // Name
+  Logger.log('Setting name in column ' + col);
   sheet.getRange(row, col++).setValue(item.name || '');
 
   // Description
+  Logger.log('Setting description in column ' + col);
   sheet.getRange(row, col++).setValue(item.description || '');
 
   // Category
+  Logger.log('Setting category in column ' + col);
   sheet.getRange(row, col++).setValue(item.categoryName || '');
 
   // Qty (default to 1)
+  Logger.log('Setting quantity in column ' + col);
   sheet.getRange(row, col++).setValue(1);
 
   // Populate configured attributes
   var columns = getItemColumns();
+  Logger.log('Populating ' + columns.length + ' attribute columns');
   columns.forEach(function(column) {
     var value = getAttributeValue(item, column.attributeGuid);
     if (value) {
+      Logger.log('Setting attribute "' + column.header + '" in column ' + col);
       sheet.getRange(row, col).setValue(value);
     }
     col++;
@@ -976,9 +1030,12 @@ function insertItemIntoRackConfig(sheet, row, item) {
   // Apply category color to entire row
   var categoryColor = getCategoryColor(item.categoryName);
   if (categoryColor) {
+    Logger.log('Applying category color: ' + categoryColor);
     var lastCol = sheet.getLastColumn();
     sheet.getRange(row, 1, 1, lastCol).setBackground(categoryColor);
   }
+
+  Logger.log('=== INSERT ITEM INTO RACK CONFIG COMPLETE ===');
 }
 
 /**

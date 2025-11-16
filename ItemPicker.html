@@ -367,6 +367,40 @@
     .hidden {
       display: none !important;
     }
+
+    .insert-button {
+      width: 100%;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #34a853 0%, #2d8e47 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin: 10px 15px;
+      width: calc(100% - 30px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .insert-button:hover:not(:disabled) {
+      background: linear-gradient(135deg, #2d8e47 0%, #34a853 100%);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      transform: translateY(-1px);
+    }
+
+    .insert-button:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .insert-button:disabled {
+      background: #e0e0e0;
+      color: #999;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
   </style>
 </head>
 <body>
@@ -397,6 +431,10 @@
       <div class="item-count" id="itemCount">
         <strong>0</strong> items found
       </div>
+
+      <button class="insert-button" id="insertButton" onclick="insertItem()" disabled>
+        📍 Insert Selected Item
+      </button>
 
       <div id="itemsLoading" class="loading hidden">
         <div class="spinner"></div>
@@ -797,7 +835,46 @@
       });
       event.currentTarget.classList.add('selected');
 
+      // Enable the insert button
+      document.getElementById('insertButton').disabled = false;
+
       google.script.run.setSelectedItem(item);
+    }
+
+    function insertItem() {
+      if (!selectedItem) {
+        alert('Please select an item first');
+        return;
+      }
+
+      // Disable button during insertion
+      var button = document.getElementById('insertButton');
+      button.disabled = true;
+      button.textContent = '⏳ Inserting...';
+
+      google.script.run
+        .withSuccessHandler(function() {
+          console.log('Item inserted successfully');
+          button.textContent = '✓ Item Inserted!';
+
+          // Reset after 2 seconds
+          setTimeout(function() {
+            selectedItem = null;
+            var cards = document.querySelectorAll('.item-card');
+            cards.forEach(function(card) {
+              card.classList.remove('selected');
+            });
+            button.textContent = '📍 Insert Selected Item';
+            button.disabled = true;
+          }, 2000);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error inserting item:', error);
+          alert('Error inserting item: ' + error.message);
+          button.textContent = '📍 Insert Selected Item';
+          button.disabled = false;
+        })
+        .insertSelectedItem();
     }
 
     function updateItemCount() {

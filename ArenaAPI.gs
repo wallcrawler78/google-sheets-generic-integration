@@ -121,18 +121,35 @@ ArenaAPIClient.prototype.makeRequest = function(endpoint, options) {
 
 /**
  * Tests the connection to the Arena API
- * @return {Object} Result object with success status
+ * @return {Object} Result object with success status and metrics
  */
 ArenaAPIClient.prototype.testConnection = function() {
   try {
-    // Test connection by fetching workspace info
-    var result = this.getWorkspaceInfo();
+    // If we got this far, the connection is working (constructor already logged in)
+    // Now gather some metrics
+    Logger.log('Testing connection and gathering metrics...');
+
+    // Get all items to calculate metrics
+    var items = this.getAllItems(400);
+
+    // Count unique categories
+    var categorySet = {};
+    items.forEach(function(item) {
+      var categoryObj = item.category || item.Category || {};
+      var categoryName = categoryObj.name || categoryObj.Name || 'Uncategorized';
+      categorySet[categoryName] = true;
+    });
+
+    var categoryCount = Object.keys(categorySet).length;
+
+    Logger.log('Connection test successful - ' + items.length + ' items, ' + categoryCount + ' categories');
 
     return {
       success: true,
       message: 'Successfully connected to Arena API',
       workspaceId: this.workspaceId,
-      workspaceName: result.name || 'Unknown'
+      totalItems: items.length,
+      categoryCount: categoryCount
     };
   } catch (error) {
     Logger.log('Connection test failed: ' + error.message);
