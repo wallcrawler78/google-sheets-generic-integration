@@ -613,10 +613,27 @@ function loadItemPickerData(forceRefresh) {
 
       // Log first item's raw structure to understand Arena's field names
       if (rawItems.indexOf(item) === 0) {
-        Logger.log('RAW ARENA ITEM STRUCTURE:');
+        Logger.log('=== RAW ARENA ITEM STRUCTURE (responseview=full) ===');
         Logger.log('Available fields: ' + Object.keys(item).join(', '));
         Logger.log('description field: ' + (item.description || item.Description || 'NOT FOUND'));
-        Logger.log('Full item object: ' + JSON.stringify(item));
+
+        // Log badge-related fields specifically
+        Logger.log('--- BADGE DETECTION FIELDS ---');
+        Logger.log('futureChanges field: ' + (item.futureChanges ? JSON.stringify(item.futureChanges) : 'NOT FOUND'));
+        Logger.log('FutureChanges field: ' + (item.FutureChanges ? JSON.stringify(item.FutureChanges) : 'NOT FOUND'));
+        Logger.log('files field: ' + (item.files ? JSON.stringify(item.files) : 'NOT FOUND'));
+        Logger.log('Files field: ' + (item.Files ? JSON.stringify(item.Files) : 'NOT FOUND'));
+        Logger.log('fileCount field: ' + (item.fileCount || item.FileCount || 'NOT FOUND'));
+        Logger.log('changeCount field: ' + (item.changeCount || item.ChangeCount || 'NOT FOUND'));
+
+        // Log ID fields for URL construction
+        Logger.log('--- URL CONSTRUCTION FIELDS ---');
+        Logger.log('itemId: ' + (item.itemId || item.ItemId || item.id || item.Id || 'NOT FOUND'));
+        Logger.log('versionId: ' + (item.versionId || item.VersionId || 'NOT FOUND'));
+
+        Logger.log('--- FULL ITEM OBJECT ---');
+        Logger.log(JSON.stringify(item, null, 2));
+        Logger.log('=== END RAW ARENA ITEM STRUCTURE ===');
       }
 
       // Extract IDs needed for Arena web URL
@@ -667,9 +684,17 @@ function loadItemPickerData(forceRefresh) {
 
     Logger.log('Mapped ' + mappedItems.length + ' items for Item Picker');
 
+    // Log badge detection summary
+    var itemsWithECO = mappedItems.filter(function(i) { return i.hasPendingChanges; }).length;
+    var itemsWithFiles = mappedItems.filter(function(i) { return i.hasFiles; }).length;
+    Logger.log('=== BADGE DETECTION SUMMARY ===');
+    Logger.log('Items with pending ECOs: ' + itemsWithECO + ' / ' + mappedItems.length);
+    Logger.log('Items with files: ' + itemsWithFiles + ' / ' + mappedItems.length);
+    Logger.log('=== END BADGE SUMMARY ===');
+
     // Log first item for debugging
     if (mappedItems.length > 0) {
-      Logger.log('Sample item: ' + JSON.stringify(mappedItems[0]));
+      Logger.log('Sample mapped item: ' + JSON.stringify(mappedItems[0]));
     }
 
     var categories = getCategoriesWithFavorites();

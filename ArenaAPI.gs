@@ -172,6 +172,10 @@ ArenaAPIClient.prototype.getItems = function(options) {
 
   // Add query parameters if provided
   var queryParams = [];
+
+  // Add responseview=full to get complete item details including file counts, etc.
+  queryParams.push('responseview=full');
+
   if (options.category) {
     queryParams.push('category=' + encodeURIComponent(options.category));
   }
@@ -195,7 +199,7 @@ ArenaAPIClient.prototype.getItems = function(options) {
  * @return {Object} Item data
  */
 ArenaAPIClient.prototype.getItem = function(itemId) {
-  var endpoint = '/items/' + encodeURIComponent(itemId);
+  var endpoint = '/items/' + encodeURIComponent(itemId) + '?responseview=full';
   return this.makeRequest(endpoint, { method: 'GET' });
 };
 
