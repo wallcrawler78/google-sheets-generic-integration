@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+      background: #f5f5f5;
+    }
+
+    .container {
+      max-width: 600px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #1a73e8;
+      margin-top: 0;
+      font-size: 20px;
+      border-bottom: 2px solid #1a73e8;
+      padding-bottom: 10px;
+    }
+
+    .description {
+      margin-bottom: 20px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .info-box {
+      background: #e8f0fe;
+      border-left: 4px solid #1a73e8;
+      padding: 12px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+
+    .config-section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .section-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .attribute-select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .format-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .format-help {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    .example-box {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    .example-title {
+      font-weight: bold;
+      color: #1a73e8;
+      margin-bottom: 5px;
+    }
+
+    .example-text {
+      font-family: 'Courier New', monospace;
+      color: #333;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+      background-color: #1a73e8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: #1557b0;
+    }
+
+    .btn-primary:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background-color: #f1f3f4;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background-color: #e8eaed;
+    }
+
+    .btn-reset {
+      background-color: #ea4335;
+      color: white;
+    }
+
+    .btn-reset:hover {
+      background-color: #d33b2c;
+    }
+
+    .message {
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    .message.success {
+      background-color: #e6f4ea;
+      color: #137333;
+      border: 1px solid #81c995;
+    }
+
+    .message.error {
+      background-color: #fce8e6;
+      color: #c5221f;
+      border: 1px solid #f28b82;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1a73e8;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Configure BOM Position Attribute</h2>
+
+    <div class="description">
+      Configure which BOM attribute should be used to track rack positions when pushing to Arena.
+      This works like reference designators for electrical components - each rack will be tagged with its positions (e.g., "Pos 1, Pos 3, Pos 8").
+    </div>
+
+    <div id="message" class="message hidden"></div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Loading attributes from Arena...</p>
+    </div>
+
+    <div id="content" class="hidden">
+      <div class="info-box">
+        <strong>How it works:</strong><br>
+        When you push a POD structure to Arena, each Rack on a Row's BOM will automatically be tagged with its position names from the Overview sheet.
+      </div>
+
+      <div class="config-section">
+        <div class="section-title">Select BOM Attribute for Position Tracking</div>
+        <select id="attributeSelect" class="attribute-select">
+          <option value="">-- No position tracking (disabled) --</option>
+        </select>
+        <div class="format-help">
+          Select a text-type BOM attribute from Arena to store position information.
+          If no suitable attribute exists, you'll need to create one in Arena first.
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="section-title">Position Name Format</div>
+        <input type="text" id="formatInput" class="format-input" placeholder="Pos {n}" />
+        <div class="format-help">
+          Use {n} as a placeholder for the position number (e.g., "Pos {n}" becomes "Pos 1, Pos 2, Pos 3")
+        </div>
+
+        <div class="example-box">
+          <div class="example-title">Example Output:</div>
+          <div class="example-text" id="exampleOutput">Pos 1, Pos 3, Pos 8</div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button type="button" class="btn-reset" onclick="clearConfiguration()">Clear Configuration</button>
+        <button type="button" class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+        <button type="button" class="btn-primary" id="saveButton" onclick="saveConfiguration()">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var availableAttributes = [];
+    var currentConfig = {};
+
+    // Load data on page load
+    google.script.run
+      .withSuccessHandler(function(data) {
+        availableAttributes = data.availableAttributes || [];
+        currentConfig = data.currentSelection || {};
+
+        populateAttributeSelect();
+        updateExample();
+
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+      })
+      .withFailureHandler(function(error) {
+        showMessage('Error loading configuration: ' + error.message, 'error');
+        document.getElementById('loading').classList.add('hidden');
+      })
+      .loadBOMPositionConfigData();
+
+    function populateAttributeSelect() {
+      var select = document.getElementById('attributeSelect');
+      var formatInput = document.getElementById('formatInput');
+
+      // Clear existing options (except first one)
+      select.innerHTML = '<option value="">-- No position tracking (disabled) --</option>';
+
+      // Add available attributes
+      availableAttributes.forEach(function(attr) {
+        var option = document.createElement('option');
+        option.value = attr.guid;
+        option.textContent = attr.name + (attr.fullPath ? ' (' + attr.fullPath + ')' : '');
+        option.dataset.name = attr.name;
+
+        // Select if this is the current config
+        if (currentConfig.guid === attr.guid) {
+          option.selected = true;
+        }
+
+        select.appendChild(option);
+      });
+
+      // Set current format
+      if (currentConfig.format) {
+        formatInput.value = currentConfig.format;
+      } else {
+        formatInput.value = 'Pos {n}';
+      }
+
+      // Add change listeners
+      select.addEventListener('change', updateExample);
+      formatInput.addEventListener('input', updateExample);
+    }
+
+    function updateExample() {
+      var formatInput = document.getElementById('formatInput');
+      var exampleOutput = document.getElementById('exampleOutput');
+      var saveButton = document.getElementById('saveButton');
+
+      var format = formatInput.value || 'Pos {n}';
+
+      // Generate example with positions 1, 3, and 8
+      var examples = [1, 3, 8].map(function(n) {
+        return format.replace('{n}', n);
+      });
+
+      exampleOutput.textContent = examples.join(', ');
+
+      // Enable/disable save button based on selection
+      var select = document.getElementById('attributeSelect');
+      saveButton.disabled = false; // Always allow saving (can save "disabled" state)
+    }
+
+    function saveConfiguration() {
+      var select = document.getElementById('attributeSelect');
+      var formatInput = document.getElementById('formatInput');
+
+      var config = {
+        guid: select.value || null,
+        name: select.value ? select.options[select.selectedIndex].dataset.name : null,
+        format: formatInput.value || 'Pos {n}'
+      };
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (config.guid) {
+            showMessage('Position attribute configured: ' + config.name, 'success');
+          } else {
+            showMessage('Position tracking disabled', 'success');
+          }
+
+          setTimeout(function() {
+            google.script.host.close();
+          }, 1500);
+        })
+        .withFailureHandler(function(error) {
+          showMessage('Error saving configuration: ' + error.message, 'error');
+        })
+        .saveBOMPositionAttribute(config);
+    }
+
+    function clearConfiguration() {
+      if (!confirm('Clear BOM position attribute configuration?')) return;
+
+      var select = document.getElementById('attributeSelect');
+      var formatInput = document.getElementById('formatInput');
+
+      select.value = '';
+      formatInput.value = 'Pos {n}';
+      updateExample();
+
+      showMessage('Configuration cleared. Click Save to apply.', 'success');
+    }
+
+    function showMessage(text, type) {
+      var messageDiv = document.getElementById('message');
+      messageDiv.textContent = text;
+      messageDiv.className = 'message ' + type;
+      messageDiv.classList.remove('hidden');
+
+      setTimeout(function() {
+        messageDiv.classList.add('hidden');
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

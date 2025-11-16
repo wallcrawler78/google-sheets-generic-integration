@@ -314,7 +314,17 @@ function buildBOMStructure(sheet) {
  * @param {string} parentGuid - Parent item GUID
  * @param {Array} bomLines - Array of BOM line objects with itemGuid and itemNumber
  */
-function syncBOMToArena(client, parentGuid, bomLines) {
+/**
+ * Syncs BOM lines to Arena (creates/updates BOM for a parent item)
+ * @param {ArenaAPIClient} client - Arena API client
+ * @param {string} parentGuid - Parent item GUID
+ * @param {Array} bomLines - Array of BOM line objects {itemNumber, itemGuid, quantity, level, attributes}
+ * @param {Object} options - Optional configuration {bomAttributes: {itemNumber: attributeValue}}
+ */
+function syncBOMToArena(client, parentGuid, bomLines, options) {
+  options = options || {};
+  var bomAttributes = options.bomAttributes || {};
+
   // First, get existing BOM lines for this item
   var existingBOM = [];
   try {
@@ -358,6 +368,14 @@ function syncBOMToArena(client, parentGuid, bomLines) {
         level: line.level,
         lineNumber: index + 1
       };
+
+      // Add custom BOM attributes if provided
+      if (bomAttributes[line.itemNumber]) {
+        var attrValue = bomAttributes[line.itemNumber];
+        // additionalAttributes is how Arena accepts custom BOM-level attributes
+        bomLineData.additionalAttributes = attrValue;
+        Logger.log('Adding BOM attribute for ' + line.itemNumber + ': ' + JSON.stringify(attrValue));
+      }
 
       client.makeRequest('/items/' + parentGuid + '/bom', {
         method: 'POST',
@@ -1570,7 +1588,43 @@ function createRowItems(rowData, rowLocationAttr, rowCategory) {
         }
       }
 
-      syncBOMToArena(client, rowItemGuid, bomLines);
+      // Build position mapping for BOM attributes (if configured)
+      var bomOptions = {};
+      var positionConfig = getBOMPositionAttributeConfig();
+
+      if (positionConfig) {
+        Logger.log('Position attribute configured: ' + positionConfig.name);
+
+        // Build rack-to-positions mapping
+        var rackPositions = {}; // Map: rackNumber => [positionNames]
+
+        row.positions.forEach(function(pos) {
+          if (!rackPositions[pos.itemNumber]) {
+            rackPositions[pos.itemNumber] = [];
+          }
+          rackPositions[pos.itemNumber].push(pos.positionName);
+        });
+
+        // Format position values and build BOM attributes map
+        var bomAttributes = {};
+
+        for (var rackNumber in rackPositions) {
+          var positions = rackPositions[rackNumber];
+          var formattedPositions = positions.join(', '); // e.g., "Pos 1, Pos 3, Pos 8"
+
+          // Build additionalAttributes structure for Arena API
+          bomAttributes[rackNumber] = {};
+          bomAttributes[rackNumber][positionConfig.guid] = formattedPositions;
+
+          Logger.log('Position attribute for ' + rackNumber + ': ' + formattedPositions);
+        }
+
+        bomOptions.bomAttributes = bomAttributes;
+      } else {
+        Logger.log('No position attribute configured - skipping position tracking');
+      }
+
+      syncBOMToArena(client, rowItemGuid, bomLines, bomOptions);
       Logger.log('Added ' + bomLines.length + ' racks to row BOM');
 
       rowItems.push({
