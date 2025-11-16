@@ -811,13 +811,17 @@
           button.textContent = 'Place Item (Auto-Create Rack)';
           button.disabled = false;
 
-          // Show success feedback
-          showToast('Rack created & BOM pulled successfully!');
-
-          // Reload rack list in case user switches back to Racks tab
+          // Reload rack list and update the UI
           google.script.run
             .withSuccessHandler(function(racks) {
               allRacks = racks;
+              // Update the visual display in the Racks tab
+              renderRacks(racks);
+              console.log('✅ Rack list refreshed - ' + racks.length + ' racks available');
+
+              // Show success feedback with rack count
+              var rackName = selectedArenaItem.number || selectedArenaItem.name;
+              showToast('✅ Rack "' + rackName + '" created!\n📦 ' + racks.length + ' rack(s) available in Racks tab');
             })
             .getAllRackConfigurationsForPicker();
         })
