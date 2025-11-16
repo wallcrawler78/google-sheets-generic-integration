@@ -1977,14 +1977,24 @@ function validatePreconditions(overviewSheet, customRacks) {
         }
 
         if (!attrFound) {
+          Logger.log('⚠ BOM Position attribute not found - clearing invalid configuration');
+          // Clear the invalid configuration so it won't be used during row creation
+          clearBOMPositionAttribute();
+
           warnings.push('BOM Position attribute "' + positionConfig.name + '" (GUID: ' + positionConfig.guid + ') configured but not found in Arena BOM attributes. ' +
                        'It may have been deleted or is an Item attribute (not a BOM attribute). ' +
+                       'Configuration has been cleared automatically. ' +
                        'Reconfigure using: Arena Data Center > Configuration > Rack BOM Location Setting');
         } else {
           Logger.log('✓ BOM Position attribute "' + positionConfig.name + '" exists in Arena');
         }
       } catch (bomAttrError) {
-        warnings.push('Could not verify BOM Position attribute: ' + bomAttrError.message);
+        Logger.log('⚠ Could not fetch BOM attributes - clearing invalid configuration');
+        // If we can't fetch BOM attributes, clear the config to prevent errors during row creation
+        clearBOMPositionAttribute();
+
+        warnings.push('Could not verify BOM Position attribute: ' + bomAttrError.message + '. ' +
+                     'Configuration has been cleared automatically. Position tracking will be disabled for this POD push.');
       }
     } else {
       Logger.log('✓ BOM Position attribute not configured (optional feature)');
