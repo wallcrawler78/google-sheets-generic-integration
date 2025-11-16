@@ -368,6 +368,36 @@
     .hidden {
       display: none !important;
     }
+
+    .help-icon {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      line-height: 20px;
+      text-align: center;
+      background: #1a73e8;
+      color: white;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .help-icon:hover {
+      background: #174ea6;
+      transform: scale(1.1);
+    }
+
+    .tab-header {
+      display: flex;
+      align-items: center;
+      padding: 0 15px 10px 15px;
+      font-size: 14px;
+      color: #5f6368;
+    }
   </style>
 </head>
 <body>
@@ -386,10 +416,9 @@
     <!-- Racks Tab -->
     <div class="tab-content active" id="racksTab">
       <div class="content">
-        <div class="info-box">
-          🗄️ <strong>Existing Racks:</strong> Quick access to configured racks<br>
-          💡 <strong>Single/Multi-cell:</strong> Select cell(s), then choose a rack to place<br>
-          🌐 <strong>New Items:</strong> Use "From Arena" tab to auto-create rack configs
+        <div class="tab-header">
+          🗄️ Existing Rack Configurations
+          <span class="help-icon" onclick="showRacksHelp()" title="Click for help">?</span>
         </div>
 
         <div class="search-box">
@@ -415,10 +444,9 @@
     <!-- From Arena Tab -->
     <div class="tab-content" id="arenaTab">
       <div class="content">
-        <div class="info-box">
-          🌐 <strong>Browse ALL Arena Items</strong><br>
-          Select any Arena item to auto-create a rack configuration with its BOM.<br>
-          Perfect for items that don't have a rack config yet!
+        <div class="tab-header">
+          🌐 Browse All Arena Items
+          <span class="help-icon" onclick="showArenaHelp()" title="Click for help">?</span>
         </div>
 
         <div class="search-box">
@@ -671,6 +699,43 @@
       setTimeout(function() {
         toast.remove();
       }, 2000);
+    }
+
+    function showRacksHelp() {
+      alert(
+        '🗄️ RACKS TAB HELP\n\n' +
+        'WHAT IT SHOWS:\n' +
+        '• All rack configuration tabs in this spreadsheet\n' +
+        '• Automatically updates when you create new racks\n\n' +
+        'HOW TO USE:\n' +
+        '1. Select cell(s) in your overview layout\n' +
+        '2. Choose a rack from the list\n' +
+        '3. Click "Place Rack in Selected Cell"\n\n' +
+        'TIPS:\n' +
+        '• Select single cell for 1x1 placement\n' +
+        '• Select multiple cells for merged placement\n' +
+        '• Use "From Arena" tab to create new racks'
+      );
+    }
+
+    function showArenaHelp() {
+      alert(
+        '🌐 FROM ARENA TAB HELP\n\n' +
+        'WHAT IT DOES:\n' +
+        '• Browse ALL items from your Arena workspace\n' +
+        '• Auto-create rack configuration with BOM\n' +
+        '• Perfect for items without existing rack tabs\n\n' +
+        'HOW TO USE:\n' +
+        '1. Search for an Arena item\n' +
+        '2. Select it from the list\n' +
+        '3. Select cell(s) in overview\n' +
+        '4. Click "Place Item (Auto-Create Rack)"\n\n' +
+        'WHAT HAPPENS:\n' +
+        '• Creates new rack config tab\n' +
+        '• Pulls BOM from Arena\n' +
+        '• Places rack in overview\n' +
+        '• Adds to "Racks" tab list automatically'
+      );
     }
 
     // Arena Items Tab Functions
