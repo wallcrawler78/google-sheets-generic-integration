@@ -427,6 +427,14 @@ function syncBOMToArena(client, parentGuid, bomLines, options) {
 
     } catch (error) {
       var errorMsg = 'Failed to add BOM line ' + (index + 1) + ' (' + line.itemNumber + '): ' + error.message;
+
+      // Check if this is an attribute error and provide helpful guidance
+      if (error.message && (error.message.indexOf('additional attribute') !== -1 ||
+                           error.message.indexOf('additionalAttributes') !== -1)) {
+        errorMsg += '\n\nThis error suggests the configured BOM attribute may not be valid. ' +
+                   'Please reconfigure using: Arena Data Center > Configuration > Rack BOM Location Setting';
+      }
+
       Logger.log('ERROR: ' + errorMsg);
       throw new Error(errorMsg);  // Fail loudly - don't continue with incomplete BOM
     }

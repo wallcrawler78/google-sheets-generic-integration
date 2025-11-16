@@ -1,8 +1,10 @@
-# BOM Position Attribute Feature
+# Rack BOM Location Setting Feature
 
 ## Overview
 
 This feature enables automatic tagging of rack items with their position locations when pushing POD structures to Arena. It works similarly to reference designators on electrical components - each rack on a Row's BOM is tagged with its specific positions (e.g., "Pos 1, Pos 3, Pos 8").
+
+**Important:** This feature uses **BOM-level attributes** (not item-level attributes). BOM attributes are configured in Arena and appear on BOM lines, storing information about the relationship between parent and child items.
 
 ## Problem Solved
 
@@ -23,11 +25,11 @@ Configuration is stored in `PropertiesService.getUserProperties()` with the foll
 #### 1. BOMConfiguration.gs
 
 New file containing:
-- `showConfigureBOMPositionAttribute()` - Displays configuration dialog
+- `showRackBOMLocationSetting()` - Displays configuration dialog
 - `loadBOMPositionConfigData()` - Loads available BOM attributes and current settings
 - `saveBOMPositionAttribute()` - Saves user's attribute selection
 - `getBOMPositionAttributeConfig()` - Retrieves current configuration
-- `getBOMAttributes()` - Fetches BOM attributes from Arena (filtered to text types only)
+- `getBOMAttributes()` - Fetches BOM attributes from Arena via `/settings/items/bom/attributes` (filtered to text types only)
 
 #### 2. ConfigureBOMPositionAttribute.html
 
@@ -55,7 +57,7 @@ UI dialog for selecting and configuring the BOM position attribute:
 
 Added menu item:
 ```
-Arena Data Center > Configuration > Configure BOM Position Attribute
+Arena Data Center > Configuration > Rack BOM Location Setting
 ```
 
 ## Data Flow
@@ -180,6 +182,57 @@ Checkboxes, numbers, and other non-text types are filtered out since they can't 
 ✅ **Automatic** - System builds mapping from existing overview data
 ✅ **Non-breaking** - Only applies when configured; existing flows unchanged
 ✅ **Intuitive** - Mirrors reference designator pattern users already understand
+
+## Troubleshooting
+
+### Error: "The additional attribute is not recognized"
+
+This error occurs when the configured attribute is an **Item attribute** instead of a **BOM attribute**.
+
+**Solution:**
+1. Open Arena Data Center > Configuration > Rack BOM Location Setting
+2. Clear the current configuration (if shown as invalid)
+3. Select a valid BOM-level attribute from the dropdown
+4. Verify in Arena that the attribute appears in your Custom BOM views (not just item specs)
+
+**How to verify BOM vs Item attributes:**
+- **BOM attributes**: Appear in Arena under Items > Custom BOMs > Attribute column
+- **Item attributes**: Appear on item specs page (Name, Description, etc.)
+- **API difference**: Fetched from `/settings/items/bom/attributes` (BOM) vs `/settings/items/attributes` (Item)
+
+### Configuration shows warning about "Previously configured attribute not found"
+
+This means the attribute was deleted from Arena, or was an Item attribute mistakenly configured before the validation was added.
+
+**Solution:**
+1. The system automatically clears invalid configurations
+2. Select a new valid BOM attribute from the dropdown
+3. Save the configuration
+
+### How to create a BOM attribute in Arena
+
+If you don't have a suitable BOM attribute:
+
+1. In Arena, go to **Workspaces > Items > Custom BOMs**
+2. Create or edit a Custom BOM view for your category (e.g., "POD", "ROW")
+3. Add an attribute column (Arena will show you BOM-level attributes)
+4. Create a new BOM attribute if needed:
+   - Type: Single Line Text or Multi Line Text
+   - Name: e.g., "Rack Location" or "Position"
+5. Return to Google Sheets and refresh the Rack BOM Location Setting dialog
+6. Select your new BOM attribute
+
+### POD push fails with BOM line errors
+
+**Symptoms:**
+- Error during Row creation: "Failed to add BOM line..."
+- Attribute-related error messages
+
+**Solutions:**
+1. Check that attribute is configured for the ROW category's Custom BOM view
+2. Verify attribute GUID matches between configuration and Arena
+3. Try clearing configuration and running POD push without position tracking
+4. Reconfigure with a known-good BOM attribute
 
 ## Future Enhancements
 

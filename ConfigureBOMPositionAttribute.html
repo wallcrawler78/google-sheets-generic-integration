@@ -196,11 +196,12 @@
 </head>
 <body>
   <div class="container">
-    <h2>Configure BOM Position Attribute</h2>
+    <h2>Rack BOM Location Setting</h2>
 
     <div class="description">
       Configure which BOM attribute should be used to track rack positions when pushing to Arena.
-      This works like reference designators for electrical components - each rack will be tagged with its positions (e.g., "Pos 1, Pos 3, Pos 8").
+      Each rack will be tagged with its positions on the BOM line (e.g., "Pos 1, Pos 3, Pos 8").
+      <strong>Note:</strong> Only BOM-level attributes can be used here (not item-level attributes).
     </div>
 
     <div id="message" class="message hidden"></div>
@@ -260,6 +261,11 @@
 
         populateAttributeSelect();
         updateExample();
+
+        // Show validation warning if present
+        if (data.validationWarning) {
+          showMessage(data.validationWarning, 'error');
+        }
 
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('content').classList.remove('hidden');

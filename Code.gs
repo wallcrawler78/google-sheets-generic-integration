@@ -22,7 +22,7 @@ function onOpen(e) {
       .addItem('Configure Category Colors', 'showConfigureColors')
       .addItem('Configure Rack Colors', 'showConfigureRackColors')
       .addItem('Configure BOM Levels', 'showConfigureBOMLevels')
-      .addItem('Configure BOM Position Attribute', 'showConfigureBOMPositionAttribute'))
+      .addItem('Rack BOM Location Setting', 'showRackBOMLocationSetting'))
     .addSeparator()
     .addItem('Show Item Picker', 'showItemPicker')
     .addItem('Show Rack Picker', 'showRackPicker')

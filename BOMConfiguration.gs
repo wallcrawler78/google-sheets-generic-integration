@@ -11,14 +11,14 @@ var BOM_CONFIG_KEYS = {
 };
 
 /**
- * Shows the BOM Position Attribute configuration dialog
+ * Shows the Rack BOM Location Setting configuration dialog
  */
-function showConfigureBOMPositionAttribute() {
+function showRackBOMLocationSetting() {
   var html = HtmlService.createHtmlOutputFromFile('ConfigureBOMPositionAttribute')
     .setWidth(600)
     .setHeight(550)
-    .setTitle('Configure BOM Position Attribute');
-  SpreadsheetApp.getUi().showModalDialog(html, 'BOM Position Configuration');
+    .setTitle('Rack BOM Location Setting');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Rack BOM Location Configuration');
 }
 
 /**
@@ -30,8 +30,7 @@ function loadBOMPositionConfigData() {
     var client = new ArenaAPIClient();
 
     // Get all BOM attributes from Arena
-    // For now, we'll query attributes by getting them from a category
-    // In a real implementation, Arena API should have a dedicated BOM attributes endpoint
+    // Fetches BOM attributes (attributes that can be set on BOM lines)
     var bomAttributes = getBOMAttributes(client);
 
     // Filter to text-type attributes only (exclude checkboxes, numbers, etc.)
@@ -47,13 +46,34 @@ function loadBOMPositionConfigData() {
     var currentAttributeName = userProperties.getProperty(BOM_CONFIG_KEYS.POSITION_ATTRIBUTE_NAME);
     var positionFormat = userProperties.getProperty(BOM_CONFIG_KEYS.POSITION_FORMAT) || 'Pos {n}';
 
+    // Validate that the stored attribute still exists in BOM attributes
+    var isValid = false;
+    var validationWarning = null;
+
+    if (currentAttributeGuid) {
+      isValid = textAttributes.some(function(attr) {
+        return attr.guid === currentAttributeGuid;
+      });
+
+      if (!isValid) {
+        validationWarning = 'Previously configured attribute "' + (currentAttributeName || currentAttributeGuid) +
+                          '" not found in current BOM attributes. It may have been deleted or is not a valid BOM attribute. ' +
+                          'Please select a valid BOM-level attribute.';
+        Logger.log('⚠ Configuration validation: ' + validationWarning);
+        // Clear invalid configuration
+        currentAttributeGuid = null;
+        currentAttributeName = null;
+      }
+    }
+
     return {
       availableAttributes: textAttributes,
       currentSelection: {
         guid: currentAttributeGuid,
         name: currentAttributeName,
         format: positionFormat
-      }
+      },
+      validationWarning: validationWarning
     };
 
   } catch (error) {
