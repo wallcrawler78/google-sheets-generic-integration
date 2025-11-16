@@ -619,47 +619,45 @@ function loadItemPickerData(forceRefresh) {
 
         // Log badge-related fields specifically
         Logger.log('--- BADGE DETECTION FIELDS ---');
+        Logger.log('modifiedFiles field: ' + (item.modifiedFiles !== undefined ? item.modifiedFiles : 'NOT FOUND'));
         Logger.log('futureChanges field: ' + (item.futureChanges ? JSON.stringify(item.futureChanges) : 'NOT FOUND'));
         Logger.log('FutureChanges field: ' + (item.FutureChanges ? JSON.stringify(item.FutureChanges) : 'NOT FOUND'));
-        Logger.log('files field: ' + (item.files ? JSON.stringify(item.files) : 'NOT FOUND'));
-        Logger.log('Files field: ' + (item.Files ? JSON.stringify(item.Files) : 'NOT FOUND'));
-        Logger.log('fileCount field: ' + (item.fileCount || item.FileCount || 'NOT FOUND'));
-        Logger.log('changeCount field: ' + (item.changeCount || item.ChangeCount || 'NOT FOUND'));
 
-        // Log ID fields for URL construction
-        Logger.log('--- URL CONSTRUCTION FIELDS ---');
-        Logger.log('itemId: ' + (item.itemId || item.ItemId || item.id || item.Id || 'NOT FOUND'));
-        Logger.log('versionId: ' + (item.versionId || item.VersionId || 'NOT FOUND'));
+        // Log URL fields
+        Logger.log('--- URL FIELDS ---');
+        var urlObj = item.url || item.Url || {};
+        Logger.log('url.api: ' + (urlObj.api || urlObj.Api || 'NOT FOUND'));
+        Logger.log('url.app: ' + (urlObj.app || urlObj.App || 'NOT FOUND'));
 
         Logger.log('--- FULL ITEM OBJECT ---');
         Logger.log(JSON.stringify(item, null, 2));
         Logger.log('=== END RAW ARENA ITEM STRUCTURE ===');
       }
 
-      // Extract IDs needed for Arena web URL
-      var itemId = item.itemId || item.ItemId || item.id || item.Id || '';
-      var versionId = item.versionId || item.VersionId || '';
       var itemNumber = item.number || item.Number || '';
 
-      // Build Arena web URL
-      var arenaWebURL = arenaClient.buildArenaWebURL(item, itemNumber);
+      // Use Arena's provided web URL (item.url.app)
+      var urlObj = item.url || item.Url || {};
+      var arenaWebURL = urlObj.app || urlObj.App || '';
+
+      // Fallback to search URL if Arena doesn't provide url.app
+      if (!arenaWebURL) {
+        arenaWebURL = 'https://app.bom.com/search?query=' + encodeURIComponent(itemNumber);
+      }
 
       // Check for pending changes (ECO) and files
-      // Note: These fields may not be in the main item response
-      // If not available, we'll need to make separate API calls
       var hasPendingChanges = false;
       var hasFiles = false;
 
-      // Check if Arena API returns these fields directly
+      // Use modifiedFiles field to detect if item has file attachments
+      if (item.modifiedFiles === true || item.ModifiedFiles === true) {
+        hasFiles = true;
+      }
+
+      // Check for pending changes (futureChanges not in response, will need Phase 2)
       if (item.futureChanges || item.FutureChanges) {
         var futureChanges = item.futureChanges || item.FutureChanges || [];
         hasPendingChanges = Array.isArray(futureChanges) && futureChanges.length > 0;
-      }
-
-      if (item.files || item.Files || item.fileCount || item.FileCount) {
-        var files = item.files || item.Files || [];
-        var fileCount = item.fileCount || item.FileCount || 0;
-        hasFiles = (Array.isArray(files) && files.length > 0) || fileCount > 0;
       }
 
       return {
@@ -674,8 +672,6 @@ function loadItemPickerData(forceRefresh) {
         lifecyclePhase: lifecycleObj.name || lifecycleObj.Name || '',
         lifecyclePhaseGuid: lifecycleObj.guid || lifecycleObj.Guid || '',
         attributes: item.attributes || item.Attributes || [],
-        itemId: itemId,
-        versionId: versionId,
         arenaWebURL: arenaWebURL,
         hasPendingChanges: hasPendingChanges,
         hasFiles: hasFiles
