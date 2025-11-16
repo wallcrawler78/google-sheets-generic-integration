@@ -766,7 +766,7 @@ function refreshCurrentRackBOM() {
     Logger.log('Current sheet has ' + currentData.length + ' rows');
 
     // Compare and detect changes
-    var changes = compareBO​Ms(currentData, arenaBOM);
+    var changes = compareBOMs(currentData, arenaBOM);
 
     Logger.log('Changes detected:');
     Logger.log('- Modified: ' + changes.modified.length);
