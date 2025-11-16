@@ -573,8 +573,31 @@ function pushBOMToArena() {
  * Loads data for the item picker sidebar
  * @return {Object} Object with items, categories, and colors
  */
-function loadItemPickerData() {
+function loadItemPickerData(forceRefresh) {
   try {
+    var cache = CacheService.getUserCache();
+    var cacheKey = 'itemPickerData_v1';
+
+    // Try to get from cache first (unless force refresh)
+    if (!forceRefresh) {
+      var cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        Logger.log('Loading Item Picker data from cache');
+        try {
+          var data = JSON.parse(cachedData);
+          Logger.log('✅ Cache hit! Loaded ' + data.items.length + ' items, ' + data.categories.length + ' categories from cache');
+          return data;
+        } catch (parseError) {
+          Logger.log('⚠️ Cache data corrupted, fetching fresh data: ' + parseError.message);
+        }
+      } else {
+        Logger.log('ℹ️ No cache found, fetching from Arena');
+      }
+    } else {
+      Logger.log('🔄 Force refresh requested, bypassing cache');
+    }
+
+    // Cache miss or force refresh - fetch from Arena
     var arenaClient = new ArenaAPIClient();
 
     // Fetch all items from Arena
@@ -623,11 +646,22 @@ function loadItemPickerData() {
 
     Logger.log('Loaded ' + categories.length + ' categories');
 
-    return {
+    var result = {
       items: mappedItems,
       categories: categories,
       colors: colors
     };
+
+    // Cache the result for 30 minutes (1800 seconds)
+    try {
+      var cacheData = JSON.stringify(result);
+      cache.put(cacheKey, cacheData, 1800);
+      Logger.log('💾 Cached ' + mappedItems.length + ' items and ' + categories.length + ' categories (expires in 30 min)');
+    } catch (cacheError) {
+      Logger.log('⚠️ Could not cache data (data may be too large): ' + cacheError.message);
+    }
+
+    return result;
   } catch (error) {
     Logger.log('ERROR in loadItemPickerData: ' + error.message + '\n' + error.stack);
     throw error;

@@ -409,8 +409,15 @@
 <body>
   <div class="sidebar">
     <div class="header">
-      <h2>Arena Item Picker</h2>
-      <p>Select items from your Arena workspace</p>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h2 style="margin: 0;">Arena Item Picker</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px;">Select items from your Arena workspace</p>
+        </div>
+        <button onclick="refreshData()" style="padding: 6px 12px; background: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;" title="Reload fresh data from Arena (clears cache)">
+          🔄 Refresh
+        </button>
+      </div>
     </div>
 
     <div class="tab-nav">
@@ -573,7 +580,7 @@
       }
     }
 
-    function loadItemsData() {
+    function loadItemsData(forceRefresh) {
       document.getElementById('itemsLoading').classList.remove('hidden');
 
       google.script.run
@@ -595,12 +602,22 @@
           populateLifecycleFilter();
           applyFilters();
           document.getElementById('itemsLoading').classList.add('hidden');
+
+          if (forceRefresh) {
+            console.log('✅ Data refreshed from Arena (' + allItems.length + ' items)');
+          }
         })
         .withFailureHandler(function(error) {
           console.error('Error loading items:', error);
           document.getElementById('itemsLoading').classList.add('hidden');
+          alert('Error loading items: ' + error.message);
         })
-        .loadItemPickerData();
+        .loadItemPickerData(forceRefresh);
+    }
+
+    function refreshData() {
+      console.log('🔄 Refreshing data from Arena...');
+      loadItemsData(true);
     }
 
     function populateCategoryFilter() {
