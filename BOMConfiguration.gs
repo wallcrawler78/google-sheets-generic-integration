@@ -119,6 +119,85 @@ function getBOMAttributes(client) {
 }
 
 /**
+ * Validates a BOM attribute configuration by checking if it exists in Arena
+ * @param {Object} config - Configuration object with guid and name
+ * @return {Object} Validation result with success flag and message
+ */
+function validateBOMAttributeConfig(config) {
+  try {
+    if (!config || !config.guid) {
+      return {
+        success: false,
+        message: 'No attribute selected. Please select a BOM attribute to validate.'
+      };
+    }
+
+    Logger.log('Validating BOM attribute config: ' + config.name + ' (' + config.guid + ')');
+
+    var client = new ArenaAPIClient();
+
+    // 1. Fetch current BOM attributes from Arena
+    var bomAttributes = getBOMAttributes(client);
+
+    if (!bomAttributes || bomAttributes.length === 0) {
+      return {
+        success: false,
+        message: 'Could not fetch BOM attributes from Arena. Check your connection.'
+      };
+    }
+
+    // 2. Check if the selected attribute exists in the BOM attributes list
+    var attributeExists = false;
+    var attributeDetails = null;
+
+    for (var i = 0; i < bomAttributes.length; i++) {
+      if (bomAttributes[i].guid === config.guid) {
+        attributeExists = true;
+        attributeDetails = bomAttributes[i];
+        break;
+      }
+    }
+
+    if (!attributeExists) {
+      return {
+        success: false,
+        message: 'Attribute "' + config.name + '" not found in Arena BOM attributes. It may have been deleted or is an Item attribute (not a BOM attribute).'
+      };
+    }
+
+    // 3. Check if it's a text type (should be filtered already, but double-check)
+    var validTypes = ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT', 'FIXED_DROP_DOWN'];
+    if (validTypes.indexOf(attributeDetails.fieldType) === -1) {
+      return {
+        success: false,
+        message: 'Attribute "' + config.name + '" is type "' + attributeDetails.fieldType + '" which cannot store position text. Use a text-type attribute.'
+      };
+    }
+
+    // 4. All checks passed
+    Logger.log('✓ Validation passed for BOM attribute: ' + config.name);
+
+    return {
+      success: true,
+      message: 'Attribute "' + config.name + '" is a valid BOM attribute and can be used for position tracking.',
+      attributeDetails: {
+        guid: attributeDetails.guid,
+        name: attributeDetails.name,
+        fieldType: attributeDetails.fieldType,
+        apiName: attributeDetails.apiName
+      }
+    };
+
+  } catch (error) {
+    Logger.log('Error validating BOM attribute config: ' + error.message);
+    return {
+      success: false,
+      message: 'Validation error: ' + error.message
+    };
+  }
+}
+
+/**
  * Saves the selected BOM position attribute configuration
  * @param {Object} config - Configuration object with guid, name, and format
  * @return {Object} Success result

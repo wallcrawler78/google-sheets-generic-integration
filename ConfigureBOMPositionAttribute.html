@@ -243,6 +243,7 @@
 
       <div class="button-group">
         <button type="button" class="btn-reset" onclick="clearConfiguration()">Clear Configuration</button>
+        <button type="button" class="btn-secondary" onclick="validateConfiguration()">Validate Config</button>
         <button type="button" class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
         <button type="button" class="btn-primary" id="saveButton" onclick="saveConfiguration()">Save Configuration</button>
       </div>
@@ -355,6 +356,35 @@
           showMessage('Error saving configuration: ' + error.message, 'error');
         })
         .saveBOMPositionAttribute(config);
+    }
+
+    function validateConfiguration() {
+      var select = document.getElementById('attributeSelect');
+
+      if (!select.value) {
+        showMessage('Please select a BOM attribute first', 'error');
+        return;
+      }
+
+      var config = {
+        guid: select.value,
+        name: select.options[select.selectedIndex].dataset.name
+      };
+
+      showMessage('Validating configuration...', 'success');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('✓ Configuration is valid! Attribute "' + config.name + '" can be used on BOM lines.', 'success');
+          } else {
+            showMessage('✗ Validation failed: ' + result.message, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('✗ Validation error: ' + error.message, 'error');
+        })
+        .validateBOMAttributeConfig(config);
     }
 
     function clearConfiguration() {
