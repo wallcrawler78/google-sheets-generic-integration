@@ -1697,9 +1697,13 @@ function createRowItems(rowData, rowLocationAttr, rowCategory) {
           var positions = rackPositions[rackNumber];
           var formattedPositions = positions.join(', '); // e.g., "Pos 1, Pos 3, Pos 8"
 
-          // Build additionalAttributes structure for Arena API
-          bomAttributes[rackNumber] = {};
-          bomAttributes[rackNumber][positionConfig.guid] = formattedPositions;
+          // Build additionalAttributes structure for Arena API (must be array format)
+          bomAttributes[rackNumber] = [
+            {
+              guid: positionConfig.guid,
+              value: formattedPositions
+            }
+          ];
 
           Logger.log('Position attribute for ' + rackNumber + ': ' + formattedPositions);
         }
