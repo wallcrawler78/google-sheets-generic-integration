@@ -619,9 +619,35 @@ function loadItemPickerData(forceRefresh) {
         Logger.log('Full item object: ' + JSON.stringify(item));
       }
 
+      // Extract IDs needed for Arena web URL
+      var itemId = item.itemId || item.ItemId || item.id || item.Id || '';
+      var versionId = item.versionId || item.VersionId || '';
+      var itemNumber = item.number || item.Number || '';
+
+      // Build Arena web URL
+      var arenaWebURL = arenaClient.buildArenaWebURL(item, itemNumber);
+
+      // Check for pending changes (ECO) and files
+      // Note: These fields may not be in the main item response
+      // If not available, we'll need to make separate API calls
+      var hasPendingChanges = false;
+      var hasFiles = false;
+
+      // Check if Arena API returns these fields directly
+      if (item.futureChanges || item.FutureChanges) {
+        var futureChanges = item.futureChanges || item.FutureChanges || [];
+        hasPendingChanges = Array.isArray(futureChanges) && futureChanges.length > 0;
+      }
+
+      if (item.files || item.Files || item.fileCount || item.FileCount) {
+        var files = item.files || item.Files || [];
+        var fileCount = item.fileCount || item.FileCount || 0;
+        hasFiles = (Array.isArray(files) && files.length > 0) || fileCount > 0;
+      }
+
       return {
         guid: item.guid || item.Guid,
-        number: item.number || item.Number || '',
+        number: itemNumber,
         name: item.name || item.Name || '',
         description: item.description || item.Description || '',
         revisionNumber: item.revisionNumber || item.RevisionNumber || item.revision || item.Revision || '',
@@ -630,7 +656,12 @@ function loadItemPickerData(forceRefresh) {
         categoryPath: categoryObj.path || categoryObj.Path || '',
         lifecyclePhase: lifecycleObj.name || lifecycleObj.Name || '',
         lifecyclePhaseGuid: lifecycleObj.guid || lifecycleObj.Guid || '',
-        attributes: item.attributes || item.Attributes || []
+        attributes: item.attributes || item.Attributes || [],
+        itemId: itemId,
+        versionId: versionId,
+        arenaWebURL: arenaWebURL,
+        hasPendingChanges: hasPendingChanges,
+        hasFiles: hasFiles
       };
     });
 

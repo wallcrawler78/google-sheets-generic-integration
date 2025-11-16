@@ -198,6 +198,41 @@
       opacity: 1;
     }
 
+    .item-badges {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .item-badge {
+      font-size: 16px;
+      cursor: default;
+      user-select: none;
+      line-height: 1;
+      opacity: 0.9;
+    }
+
+    .item-badge.eco-badge {
+      color: #ff9800;
+      filter: drop-shadow(0 1px 2px rgba(255, 152, 0, 0.3));
+    }
+
+    .item-badge.files-badge {
+      color: #1a73e8;
+      filter: drop-shadow(0 1px 2px rgba(26, 115, 232, 0.3));
+    }
+
+    .item-badge.arena-link {
+      color: #5f6368;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .item-badge.arena-link:hover {
+      color: #1a73e8;
+      transform: scale(1.15);
+    }
+
     .item-description {
       font-size: 12px;
       color: #333;
@@ -796,7 +831,7 @@
           }
         };
 
-        // Header with item number and favorite toggle
+        // Header with item number, badges, and favorite toggle
         var header = document.createElement('div');
         header.className = 'item-header';
 
@@ -804,6 +839,42 @@
         number.className = 'item-number';
         number.textContent = item.number || 'No Number';
 
+        // Badges container (ECO, Files, Arena link)
+        var badgesContainer = document.createElement('div');
+        badgesContainer.className = 'item-badges';
+
+        // ECO badge (⚠️) if item has pending changes
+        if (item.hasPendingChanges) {
+          var ecoBadge = document.createElement('span');
+          ecoBadge.className = 'item-badge eco-badge';
+          ecoBadge.textContent = '⚠️';
+          ecoBadge.title = 'Pending change order (ECO)';
+          badgesContainer.appendChild(ecoBadge);
+        }
+
+        // Files badge (📎) if item has attachments
+        if (item.hasFiles) {
+          var filesBadge = document.createElement('span');
+          filesBadge.className = 'item-badge files-badge';
+          filesBadge.textContent = '📎';
+          filesBadge.title = 'Has file attachments';
+          badgesContainer.appendChild(filesBadge);
+        }
+
+        // Arena link icon (🔗)
+        if (item.arenaWebURL) {
+          var arenaLink = document.createElement('span');
+          arenaLink.className = 'item-badge arena-link';
+          arenaLink.textContent = '🔗';
+          arenaLink.title = 'Open in Arena';
+          arenaLink.onclick = function(e) {
+            e.stopPropagation();
+            window.open(item.arenaWebURL, '_blank');
+          };
+          badgesContainer.appendChild(arenaLink);
+        }
+
+        // Favorite toggle
         var favoriteToggle = document.createElement('span');
         favoriteToggle.className = 'favorite-toggle';
         favoriteToggle.textContent = '⭐';
@@ -821,6 +892,7 @@
         };
 
         header.appendChild(number);
+        header.appendChild(badgesContainer);
         header.appendChild(favoriteToggle);
 
         var description = document.createElement('div');

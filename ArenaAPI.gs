@@ -476,3 +476,86 @@ ArenaAPIClient.prototype.exportToSheet = function(dataType) {
     throw error;
   }
 };
+
+/**
+ * Gets future change orders (ECOs) for an item
+ * @param {string} itemGuid - The item GUID
+ * @return {Array<Object>} Array of future changes, or empty array if none
+ */
+ArenaAPIClient.prototype.getItemFutureChanges = function(itemGuid) {
+  try {
+    var endpoint = '/items/' + encodeURIComponent(itemGuid) + '/futurechanges';
+    var response = this.makeRequest(endpoint, { method: 'GET' });
+
+    // Extract results array
+    var changes = response.results || response.Results || response.data || [];
+
+    if (Array.isArray(response)) {
+      changes = response;
+    }
+
+    Logger.log('Item ' + itemGuid + ' has ' + changes.length + ' future change(s)');
+    return changes;
+
+  } catch (error) {
+    Logger.log('Error fetching future changes for item ' + itemGuid + ': ' + error.message);
+    // Return empty array on error (graceful degradation)
+    return [];
+  }
+};
+
+/**
+ * Gets file attachments for an item
+ * @param {string} itemGuid - The item GUID
+ * @return {Array<Object>} Array of files, or empty array if none
+ */
+ArenaAPIClient.prototype.getItemFiles = function(itemGuid) {
+  try {
+    var endpoint = '/items/' + encodeURIComponent(itemGuid) + '/files';
+    var response = this.makeRequest(endpoint, { method: 'GET' });
+
+    // Extract results array
+    var files = response.results || response.Results || response.data || [];
+
+    if (Array.isArray(response)) {
+      files = response;
+    }
+
+    Logger.log('Item ' + itemGuid + ' has ' + files.length + ' file(s)');
+    return files;
+
+  } catch (error) {
+    Logger.log('Error fetching files for item ' + itemGuid + ': ' + error.message);
+    // Return empty array on error (graceful degradation)
+    return [];
+  }
+};
+
+/**
+ * Builds Arena web UI URL for an item
+ * @param {Object} item - The item object
+ * @param {string} itemNumber - The item number (fallback for search)
+ * @return {string} Arena web UI URL
+ */
+ArenaAPIClient.prototype.buildArenaWebURL = function(item, itemNumber) {
+  try {
+    // Extract item_id and version_id from Arena item
+    var itemId = item.itemId || item.ItemId || item.id || item.Id;
+    var versionId = item.versionId || item.VersionId;
+
+    // If we don't have the specific IDs, use search URL as fallback
+    if (!itemId || !versionId) {
+      Logger.log('WARNING: Missing itemId or versionId for ' + itemNumber + ', using search URL');
+      return 'https://app.bom.com/search?query=' + encodeURIComponent(itemNumber);
+    }
+
+    // Build the proper Arena web UI URL
+    var arenaUrl = 'https://app.bom.com/items/detail-spec?item_id=' + itemId + '&version_id=' + versionId;
+
+    return arenaUrl;
+  } catch (error) {
+    Logger.log('Error building Arena URL for ' + itemNumber + ': ' + error.message);
+    // Fallback to search URL on error
+    return 'https://app.bom.com/search?query=' + encodeURIComponent(itemNumber);
+  }
+};
