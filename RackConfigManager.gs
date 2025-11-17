@@ -219,6 +219,9 @@ function createNewRackConfiguration() {
   newSheet.setColumnWidth(5, 120);  // Lifecycle
   newSheet.setColumnWidth(6, 60);   // Qty
 
+  // Step 8b: Enable text wrapping for Description column
+  newSheet.getRange('C:C').setWrap(true);
+
   // Step 9: Populate BOM if available, otherwise add instructions
   if (arenaBOM && arenaBOM.length > 0) {
     Logger.log('Populating BOM with ' + arenaBOM.length + ' items from Arena');
