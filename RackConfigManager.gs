@@ -290,7 +290,12 @@ function createNewRackConfiguration() {
   // Step 10b: Update tab name with status indicator
   updateRackTabName(newSheet);
 
-  // Step 11: Activate the new sheet
+  // Step 11: Force all pending changes to be applied immediately
+  Logger.log('Step 11: Flushing spreadsheet changes...');
+  SpreadsheetApp.flush();
+  Logger.log('Spreadsheet flushed successfully');
+
+  // Step 12: Activate the new sheet
   newSheet.activate();
 
   var successMessage = 'Rack configuration sheet created successfully!\n\n' +
