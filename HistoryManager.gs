@@ -138,6 +138,9 @@ function getOrCreateRackHistoryTab() {
   // Set tab color to purple (history theme)
   historySheet.setTabColor('#9c27b0');
 
+  // Protect the History tab to prevent accidental edits
+  protectHistoryTab(historySheet);
+
   Logger.log('Rack History tab created successfully');
   return historySheet;
 }
@@ -794,13 +797,14 @@ function getHistoryRackList() {
 
 /**
  * Gets status statistics for sidebar
+ * Reads directly from History tab summary rows for accuracy
  * @return {Object} Status counts
  */
 function getHistoryStats() {
   try {
-    var racks = getAllRackConfigTabs();
+    var historySheet = getOrCreateRackHistoryTab();
     var stats = {
-      total: racks.length,
+      total: 0,
       synced: 0,
       outOfSync: 0,
       localModified: 0,
@@ -808,30 +812,81 @@ function getHistoryStats() {
       error: 0
     };
 
-    racks.forEach(function(rack) {
-      var status = getRackStatusFromHistory(rack.itemNumber);
+    // Read directly from History tab summary rows
+    var lastRow = historySheet.getLastRow();
+    if (lastRow < 2) {
+      return stats; // No racks yet
+    }
+
+    // Find where summary section ends (look for separator or detail header)
+    var summaryEndRow = 2;
+    for (var i = 2; i <= lastRow; i++) {
+      var cell = historySheet.getRange(i, 1);
+      var value = cell.getValue();
+      var background = cell.getBackground();
+
+      // Stop at separator (gray) or detail header (green) or "Timestamp"
+      if (background === '#f0f0f0' || background === '#34a853' || value === 'Timestamp') {
+        summaryEndRow = i - 1;
+        break;
+      }
+
+      // If we're at the last row and haven't hit a separator, use it
+      if (i === lastRow && value && value.toString().trim() !== '') {
+        summaryEndRow = i;
+      }
+    }
+
+    // Count summary rows
+    var rackCount = summaryEndRow - 1; // Subtract 1 for header row
+    if (rackCount < 1) {
+      return stats;
+    }
+
+    stats.total = rackCount;
+
+    // Read status column for all summary rows
+    var statusRange = historySheet.getRange(2, HIST_SUMMARY_STATUS_COL, rackCount, 1);
+    var statusValues = statusRange.getValues();
+
+    Logger.log('getHistoryStats: Reading ' + rackCount + ' rack statuses');
+
+    statusValues.forEach(function(row, index) {
+      var statusWithEmoji = row[0];
+      if (!statusWithEmoji) return;
+
+      // Strip emoji and whitespace to get clean status
+      var status = statusWithEmoji.toString().trim().replace(/[🔴🟢🟠🟡❌]\s*/g, '');
+
+      Logger.log('  Rack ' + (index + 1) + ': "' + statusWithEmoji + '" → "' + status + '"');
+
       switch(status) {
-        case RACK_STATUS.SYNCED:
+        case 'SYNCED':
           stats.synced++;
           break;
-        case RACK_STATUS.ARENA_MODIFIED:
+        case 'ARENA_MODIFIED':
           stats.outOfSync++;
           break;
-        case RACK_STATUS.LOCAL_MODIFIED:
+        case 'LOCAL_MODIFIED':
           stats.localModified++;
           break;
-        case RACK_STATUS.PLACEHOLDER:
+        case 'PLACEHOLDER':
           stats.placeholder++;
           break;
-        case RACK_STATUS.ERROR:
+        case 'ERROR':
           stats.error++;
           break;
+        default:
+          Logger.log('  WARNING: Unknown status "' + status + '"');
       }
     });
 
+    Logger.log('getHistoryStats: Results = ' + JSON.stringify(stats));
     return stats;
+
   } catch (error) {
     Logger.log('Error getting history stats: ' + error.message);
+    Logger.log('Error stack: ' + error.stack);
     return {
       total: 0,
       synced: 0,
@@ -863,4 +918,185 @@ function clearHistoryFilter() {
     Logger.log('Error clearing history filter: ' + error.message);
     return { success: false, message: error.message };
   }
+}
+
+// ============================================================================
+// DATA INTEGRITY & PROTECTION
+// ============================================================================
+
+/**
+ * Protects the History tab from accidental edits
+ * Allows script to edit but prevents user edits
+ * @param {Sheet} sheet - History sheet to protect
+ */
+function protectHistoryTab(sheet) {
+  try {
+    // Remove any existing protections
+    var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+    protections.forEach(function(protection) {
+      if (protection.canEdit()) {
+        protection.remove();
+      }
+    });
+
+    // Create new protection
+    var protection = sheet.protect();
+    protection.setDescription('Rack History - Managed by Arena Data Center');
+
+    // Set warning message
+    protection.setWarningOnly(false);
+
+    // Allow script owner to edit (so automated updates work)
+    var me = Session.getEffectiveUser();
+    protection.addEditor(me);
+    protection.removeEditors(protection.getEditors());
+
+    // Add warning message for users who try to edit
+    protection.setDescription(
+      'This sheet is automatically managed by the Arena Data Center system. ' +
+      'Do not edit manually - data may be overwritten. ' +
+      'Use the History Filter sidebar to view and filter history.'
+    );
+
+    Logger.log('History tab protected successfully');
+  } catch (error) {
+    Logger.log('Error protecting History tab: ' + error.message);
+    // Don't fail if protection fails - just log it
+  }
+}
+
+/**
+ * Validates History tab data integrity
+ * Checks for missing data, invalid statuses, orphaned events
+ * @return {Object} Validation results with warnings
+ */
+function validateHistoryTabIntegrity() {
+  var warnings = [];
+  var errors = [];
+
+  try {
+    var historySheet = getOrCreateRackHistoryTab();
+    var racks = getAllRackConfigTabs();
+
+    // Check 1: All racks have summary rows
+    racks.forEach(function(rack) {
+      var summaryRow = findRackHistorySummaryRow(rack.itemNumber);
+      if (summaryRow === -1) {
+        warnings.push('Rack "' + rack.itemNumber + '" missing from History tab');
+      }
+    });
+
+    // Check 2: All summary rows have corresponding rack sheets
+    var lastRow = historySheet.getLastRow();
+    for (var i = 2; i <= lastRow; i++) {
+      var cell = historySheet.getRange(i, 1);
+      var background = cell.getBackground();
+
+      // Stop at separator or detail header
+      if (background === '#f0f0f0' || background === '#34a853') {
+        break;
+      }
+
+      var itemNumber = cell.getValue();
+      if (itemNumber && itemNumber.toString().trim() !== '') {
+        var rackSheet = findRackConfigTab(itemNumber);
+        if (!rackSheet) {
+          warnings.push('History summary for "' + itemNumber + '" has no corresponding rack sheet (orphaned)');
+        }
+      }
+    }
+
+    // Check 3: Validate status values
+    var statusRange = historySheet.getRange(2, HIST_SUMMARY_STATUS_COL, lastRow - 1, 1);
+    var statusValues = statusRange.getValues();
+
+    statusValues.forEach(function(row, index) {
+      var statusWithEmoji = row[0];
+      if (!statusWithEmoji) return;
+
+      var status = statusWithEmoji.toString().trim().replace(/[🔴🟢🟠🟡❌]\s*/g, '');
+      var validStatuses = ['SYNCED', 'ARENA_MODIFIED', 'LOCAL_MODIFIED', 'PLACEHOLDER', 'ERROR', 'Timestamp', ''];
+
+      if (status !== '' && validStatuses.indexOf(status) === -1) {
+        errors.push('Row ' + (index + 2) + ': Invalid status "' + status + '"');
+      }
+    });
+
+    return {
+      success: errors.length === 0,
+      warnings: warnings,
+      errors: errors
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      warnings: warnings,
+      errors: ['Validation failed: ' + error.message]
+    };
+  }
+}
+
+/**
+ * Repairs History tab integrity issues
+ * Fixes missing summary rows, removes orphaned entries
+ * @return {Object} Repair results
+ */
+function repairHistoryTabIntegrity() {
+  var ui = SpreadsheetApp.getUi();
+  var validation = validateHistoryTabIntegrity();
+
+  if (validation.success && validation.warnings.length === 0) {
+    ui.alert('No Issues Found', 'History tab integrity is good!', ui.ButtonSet.OK);
+    return { success: true, message: 'No repairs needed' };
+  }
+
+  // Show issues and ask for confirmation
+  var message = 'Found issues with History tab:\n\n';
+
+  if (validation.errors.length > 0) {
+    message += 'ERRORS:\n';
+    validation.errors.forEach(function(err) {
+      message += '• ' + err + '\n';
+    });
+    message += '\n';
+  }
+
+  if (validation.warnings.length > 0) {
+    message += 'WARNINGS:\n';
+    validation.warnings.forEach(function(warn) {
+      message += '• ' + warn + '\n';
+    });
+  }
+
+  message += '\nAttempt to repair automatically?';
+
+  var response = ui.alert('History Integrity Issues', message, ui.ButtonSet.YES_NO);
+
+  if (response !== ui.Button.YES) {
+    return { success: false, message: 'Repair cancelled by user' };
+  }
+
+  var repaired = 0;
+
+  // Repair: Add missing summary rows
+  var racks = getAllRackConfigTabs();
+  racks.forEach(function(rack) {
+    var summaryRow = findRackHistorySummaryRow(rack.itemNumber);
+    if (summaryRow === -1) {
+      createRackHistorySummaryRow(rack.itemNumber, rack.itemName, {
+        status: RACK_STATUS.PLACEHOLDER,
+        arenaGuid: '',
+        created: new Date(),
+        lastRefresh: '',
+        lastSync: '',
+        lastPush: '',
+        checksum: ''
+      });
+      repaired++;
+    }
+  });
+
+  ui.alert('Repair Complete', 'Repaired ' + repaired + ' issue(s).', ui.ButtonSet.OK);
+  return { success: true, message: 'Repaired ' + repaired + ' issues' };
 }

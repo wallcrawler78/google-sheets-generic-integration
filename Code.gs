@@ -43,6 +43,8 @@ function onOpen(e) {
       .addItem('Repair POD/Row BOMs', 'repairPODAndRowBOMs'))
     .addSeparator()
     .addItem('View Rack History', 'viewRackHistory')
+    .addItem('Validate History Integrity', 'validateHistoryTabIntegrity')
+    .addItem('Repair History Issues', 'repairHistoryTabIntegrity')
     .addSeparator()
     .addItem('Test Connection', 'testArenaConnection')
     .addItem('Clear Credentials', 'clearCredentials')
