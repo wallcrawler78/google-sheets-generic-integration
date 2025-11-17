@@ -747,29 +747,64 @@
     function selectRackCategory(index) {
       selectedCategoryRow = { type: 'rack', index: index };
       const rackNumber = wizardData.racks[index].itemNumber;
+
+      // Clear any previous selection
+      google.script.run.setCategorySelection(null);
+
+      // Show category selector (may close wizard due to modal nesting)
       google.script.run
         .withSuccessHandler(function() {
-          // Category selector closed, retrieve selection
-          google.script.run
-            .withSuccessHandler(onCategorySelected)
-            .withFailureHandler(onError)
-            .getCategorySelection();
+          // Poll for category selection
+          pollForCategorySelection();
         })
         .withFailureHandler(onError)
         .showCategorySelector('Select Category', 'Choose category for rack ' + rackNumber);
+    }
+
+    var pollInterval = null;
+    var pollAttempts = 0;
+
+    function pollForCategorySelection() {
+      pollAttempts = 0;
+      clearInterval(pollInterval);
+
+      pollInterval = setInterval(function() {
+        pollAttempts++;
+
+        // Try to get selection
+        google.script.run
+          .withSuccessHandler(function(category) {
+            if (category) {
+              // Got a selection!
+              clearInterval(pollInterval);
+              onCategorySelected(category);
+            } else if (pollAttempts > 30) {
+              // Timeout after 30 seconds
+              clearInterval(pollInterval);
+              console.log('Category selection timeout');
+            }
+          })
+          .withFailureHandler(function(error) {
+            clearInterval(pollInterval);
+            onError(error);
+          })
+          .getCategorySelection();
+      }, 1000); // Poll every second
     }
 
     // Select category for row
     function selectRowCategory(index) {
       selectedCategoryRow = { type: 'row', index: index };
       const rowNumber = wizardData.rows[index].rowNumber;
+
+      // Clear any previous selection
+      google.script.run.setCategorySelection(null);
+
+      // Show category selector (may close wizard due to modal nesting)
       google.script.run
         .withSuccessHandler(function() {
-          // Category selector closed, retrieve selection
-          google.script.run
-            .withSuccessHandler(onCategorySelected)
-            .withFailureHandler(onError)
-            .getCategorySelection();
+          // Poll for category selection
+          pollForCategorySelection();
         })
         .withFailureHandler(onError)
         .showCategorySelector('Select Category', 'Choose category for Row ' + rowNumber);
@@ -778,13 +813,15 @@
     // Select category for POD
     function selectPODCategory() {
       selectedCategoryRow = { type: 'pod', index: null };
+
+      // Clear any previous selection
+      google.script.run.setCategorySelection(null);
+
+      // Show category selector (may close wizard due to modal nesting)
       google.script.run
         .withSuccessHandler(function() {
-          // Category selector closed, retrieve selection
-          google.script.run
-            .withSuccessHandler(onCategorySelected)
-            .withFailureHandler(onError)
-            .getCategorySelection();
+          // Poll for category selection
+          pollForCategorySelection();
         })
         .withFailureHandler(onError)
         .showCategorySelector('Select Category', 'Choose category for POD');
