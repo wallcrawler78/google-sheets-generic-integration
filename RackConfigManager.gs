@@ -147,9 +147,18 @@ function createNewRackConfiguration() {
 
   // Step 4: Create the new sheet
   var sheetName = 'Rack - ' + rackItemNumber + ' (' + rackName + ')';
-  var newSheet = ss.insertSheet(sheetName);
+  var newSheet;
+
+  try {
+    newSheet = ss.insertSheet(sheetName);
+    Logger.log('Created new sheet: ' + sheetName);
+  } catch (createError) {
+    ui.alert('Error', 'Failed to create sheet: ' + createError.message, ui.ButtonSet.OK);
+    return;
+  }
 
   // Step 5: Set up metadata row (Row 1)
+  Logger.log('Step 5: Setting up metadata row...');
   newSheet.getRange(METADATA_ROW, META_LABEL_COL).setValue('PARENT_ITEM');
   newSheet.getRange(METADATA_ROW, META_ITEM_NUM_COL).setValue(rackItemNumber);
   newSheet.getRange(METADATA_ROW, META_ITEM_NAME_COL).setValue(rackItemName);
@@ -160,6 +169,7 @@ function createNewRackConfiguration() {
   metaRange.setBackground('#e8f0fe');
   metaRange.setFontWeight('bold');
   metaRange.setFontColor('#1967d2');
+  Logger.log('Metadata row created successfully');
 
   // Step 5b: Initialize rack in History tab
   // Status depends on whether we linked to Arena item with BOM
@@ -190,26 +200,49 @@ function createNewRackConfiguration() {
   });
 
   // Step 5c: Add History link in D1
-  createHistoryLinkInRackSheet(newSheet);
+  try {
+    createHistoryLinkInRackSheet(newSheet);
+  } catch (historyLinkError) {
+    Logger.log('Warning: Could not create history link: ' + historyLinkError.message);
+  }
 
   // Step 6: Set up header row (Row 2)
-  var itemColumns = getItemColumns();
-  var headers = ['Item Number', 'Name', 'Description', 'Category', 'Lifecycle', 'Qty'];
+  Logger.log('Step 6: Setting up header row...');
 
-  // Add configured attribute columns
-  itemColumns.forEach(function(col) {
-    headers.push(col.header || col.attributeName);
-  });
+  try {
+    var itemColumns = getItemColumns();
+    Logger.log('Got item columns: ' + JSON.stringify(itemColumns));
 
-  var headerRange = newSheet.getRange(HEADER_ROW, 1, 1, headers.length);
-  headerRange.setValues([headers]);
-  headerRange.setBackground('#1a73e8');
-  headerRange.setFontColor('white');
-  headerRange.setFontWeight('bold');
-  headerRange.setHorizontalAlignment('center');
+    var headers = ['Item Number', 'Name', 'Description', 'Category', 'Lifecycle', 'Qty'];
+    Logger.log('Base headers created: ' + headers.join(', '));
+
+    // Add configured attribute columns
+    itemColumns.forEach(function(col) {
+      headers.push(col.header || col.attributeName);
+    });
+    Logger.log('Final headers with custom columns: ' + headers.join(', '));
+
+    var headerRange = newSheet.getRange(HEADER_ROW, 1, 1, headers.length);
+    Logger.log('Header range: Row ' + HEADER_ROW + ', 1, 1, ' + headers.length);
+
+    headerRange.setValues([headers]);
+    Logger.log('Headers set successfully');
+
+    headerRange.setBackground('#1a73e8');
+    headerRange.setFontColor('white');
+    headerRange.setFontWeight('bold');
+    headerRange.setHorizontalAlignment('center');
+    Logger.log('Header formatting applied');
+  } catch (headerError) {
+    Logger.log('ERROR in Step 6 (headers): ' + headerError.message);
+    Logger.log('Stack trace: ' + headerError.stack);
+    throw new Error('Failed to create header row: ' + headerError.message);
+  }
 
   // Step 7: Freeze rows 1 and 2
+  Logger.log('Step 7: Freezing rows...');
   newSheet.setFrozenRows(HEADER_ROW);
+  Logger.log('Rows frozen successfully');
 
   // Step 8: Set column widths
   newSheet.setColumnWidth(1, 120);  // Item Number
