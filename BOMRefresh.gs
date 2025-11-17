@@ -334,6 +334,18 @@ function writeBOMHistory(entries) {
 
     historySheet.setFrozenRows(1);
 
+    // Set column widths
+    historySheet.setColumnWidth(1, 150);  // Timestamp
+    historySheet.setColumnWidth(2, 120);  // Rack
+    historySheet.setColumnWidth(3, 120);  // Item Number
+    historySheet.setColumnWidth(4, 100);  // Field
+    historySheet.setColumnWidth(5, 250);  // Old Value
+    historySheet.setColumnWidth(6, 250);  // New Value
+    historySheet.setColumnWidth(7, 200);  // Changed By
+
+    // Enable text wrapping for Old Value and New Value columns
+    historySheet.getRange('E:F').setWrap(true);
+
     // Set purple tab color to match other system tabs
     historySheet.setTabColor('#9c27b0');
 
