@@ -2425,11 +2425,41 @@ function pushPODStructureToArena() {
     // Step 10: Update overview sheet with POD/Row info
     updateOverviewWithPODInfo(overviewSheet, podItem, rowItems);
 
-    // Success message
-    var successMsg = 'Successfully created POD structure in Arena!\n\n' +
-                     'POD: ' + podItem.name + ' (' + podItem.itemNumber + ')\n' +
-                     'Rows: ' + rowItems.length + '\n\n' +
-                     'Overview sheet has been updated with Arena links.';
+    // Fetch full POD item to get Arena URL
+    var podArenaItem = client.getItemByNumber(podItem.itemNumber);
+    var podArenaUrl = buildArenaItemURLFromItem(podArenaItem, podItem.itemNumber);
+
+    // Build rack summary for success message
+    var rackSummary = '';
+    var rackCount = 0;
+    rowItems.forEach(function(rowItem) {
+      rowItem.racks.forEach(function(rack) {
+        rackCount++;
+        if (rackCount <= 5) {  // Show first 5 racks
+          rackSummary += '  • ' + rack.itemNumber + ' - ' + rack.name + '\n';
+        }
+      });
+    });
+
+    if (rackCount > 5) {
+      rackSummary += '  ... and ' + (rackCount - 5) + ' more rack(s)\n';
+    }
+
+    // Success message with clickable Arena link
+    var successMsg = 'POD Structure Created Successfully!\n\n' +
+                     '📦 POD Item: ' + podItem.name + '\n' +
+                     '   Item #: ' + podItem.itemNumber + '\n' +
+                     '   Category: ' + podCategoryName + '\n\n' +
+                     '📊 Structure:\n' +
+                     '   Rows: ' + rowItems.length + '\n' +
+                     '   Racks: ' + rackCount + '\n\n';
+
+    if (rackSummary) {
+      successMsg += '🔧 Racks Included:\n' + rackSummary + '\n';
+    }
+
+    successMsg += '✓ Overview sheet updated with Arena links\n\n' +
+                  '🔗 View in Arena:\n' + podArenaUrl;
 
     ui.alert('Success', successMsg, ui.ButtonSet.OK);
 

@@ -927,11 +927,56 @@ function refreshCurrentRackBOM() {
       };
     }
 
-    // Show change summary and ask for confirmation
-    var changeMessage = buildChangeSummary(changes);
+    // Build enhanced change summary with Arena link
+    var arenaClient = new ArenaAPIClient();
+    var rackArenaItem = arenaClient.getItemByNumber(metadata.itemNumber);
+    var arenaUrl = buildArenaItemURLFromItem(rackArenaItem, metadata.itemNumber);
+
+    var totalChanges = changes.modified.length + changes.added.length + changes.removed.length;
+    var changeMessage = 'Arena has ' + totalChanges + ' change(s) for this rack:\n\n';
+
+    changeMessage += '🏷️ Rack: ' + metadata.itemName + '\n';
+    changeMessage += '   Item #: ' + metadata.itemNumber + '\n\n';
+
+    // Summarize changes
+    if (changes.modified.length > 0) {
+      changeMessage += '✏️ Modified: ' + changes.modified.length + ' item(s)\n';
+      changes.modified.slice(0, 2).forEach(function(mod) {
+        var fieldList = mod.changes.map(function(c) { return c.field; }).join(', ');
+        changeMessage += '   • ' + mod.itemNumber + ': ' + fieldList + '\n';
+      });
+      if (changes.modified.length > 2) {
+        changeMessage += '   ... and ' + (changes.modified.length - 2) + ' more\n';
+      }
+    }
+
+    if (changes.added.length > 0) {
+      changeMessage += '➕ Added: ' + changes.added.length + ' item(s)\n';
+      changes.added.slice(0, 2).forEach(function(add) {
+        changeMessage += '   • ' + add.itemNumber + ' - ' + add.name + '\n';
+      });
+      if (changes.added.length > 2) {
+        changeMessage += '   ... and ' + (changes.added.length - 2) + ' more\n';
+      }
+    }
+
+    if (changes.removed.length > 0) {
+      changeMessage += '➖ Removed: ' + changes.removed.length + ' item(s)\n';
+      changes.removed.slice(0, 2).forEach(function(rem) {
+        changeMessage += '   • ' + rem.itemNumber + ' - ' + rem.name + '\n';
+      });
+      if (changes.removed.length > 2) {
+        changeMessage += '   ... and ' + (changes.removed.length - 2) + ' more\n';
+      }
+    }
+
+    changeMessage += '\n🔗 Compare in Arena:\n' + arenaUrl + '\n\n';
+    changeMessage += '⚠️ Applying changes will overwrite your local rack data.\n\n';
+    changeMessage += 'Apply these changes from Arena?';
+
     var response = ui.alert(
       'BOM Changes Detected',
-      changeMessage + '\n\nApply these changes?',
+      changeMessage,
       ui.ButtonSet.YES_NO
     );
 
