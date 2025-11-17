@@ -2562,27 +2562,36 @@ function executePODPush(wizardData) {
       Logger.log('✓ Created rack: ' + rack.itemNumber);
     }
 
-    // STEP 2: Create all rows (batch)
-    Logger.log('Step 2: Creating ' + wizardData.rows.length + ' rows...');
+    // STEP 2: Create or update rows
+    Logger.log('Step 2: Processing ' + wizardData.rows.length + ' rows...');
 
     for (var r = 0; r < wizardData.rows.length; r++) {
       var row = wizardData.rows[r];
+      var rowItemGuid, rowItemNumber;
 
-      Logger.log('Creating row: ' + row.name);
+      if (row.exists) {
+        // Row already exists - just update its BOM
+        Logger.log('Row ' + row.rowItemNumber + ' exists - updating BOM...');
+        rowItemGuid = row.guid;
+        rowItemNumber = row.rowItemNumber;
+      } else {
+        // Create new row item
+        Logger.log('Creating new row: ' + row.name);
 
-      // Create row item
-      var rowItem = client.createItem({
-        name: row.name,
-        category: {
-          guid: row.category.guid
-        },
-        description: 'Row ' + row.rowNumber + ' containing ' + row.positions.length + ' racks'
-      });
+        var rowItem = client.createItem({
+          name: row.name,
+          category: {
+            guid: row.category.guid
+          },
+          description: 'Row ' + row.rowNumber + ' containing ' + row.positions.length + ' racks'
+        });
 
-      var rowItemGuid = rowItem.guid || rowItem.Guid;
-      var rowItemNumber = rowItem.number || rowItem.Number;
+        rowItemGuid = rowItem.guid || rowItem.Guid;
+        rowItemNumber = rowItem.number || rowItem.Number;
+        Logger.log('✓ Created row: ' + rowItemNumber);
+      }
 
-      // Create BOM for row (all racks at positions)
+      // Create/Update BOM for row (all racks at positions)
       var rowBomLines = [];
       for (var p = 0; p < row.positions.length; p++) {
         var pos = row.positions[p];
@@ -2599,31 +2608,41 @@ function executePODPush(wizardData) {
       }
 
       syncBOMToArena(client, rowItemGuid, rowBomLines);
+      Logger.log('✓ Synced BOM for row ' + rowItemNumber + ' (' + rowBomLines.length + ' racks)');
 
       createdRows.push({
         itemNumber: rowItemNumber,
         guid: rowItemGuid,
-        name: row.name
+        name: row.name || row.rowItemNumber
       });
-
-      Logger.log('✓ Created row: ' + rowItemNumber);
     }
 
-    // STEP 3: Create POD
-    Logger.log('Step 3: Creating POD...');
+    // STEP 3: Create or update POD
+    var podItemGuid, podItemNumber;
 
-    var podItem = client.createItem({
-      name: wizardData.pod.name,
-      category: {
-        guid: wizardData.pod.category.guid
-      },
-      description: 'Point of Delivery containing ' + createdRows.length + ' rows'
-    });
+    if (wizardData.pod.exists) {
+      // POD already exists - just update its BOM
+      Logger.log('Step 3: POD ' + wizardData.pod.itemNumber + ' exists - updating BOM...');
+      podItemGuid = wizardData.pod.guid;
+      podItemNumber = wizardData.pod.itemNumber;
+    } else {
+      // Create new POD
+      Logger.log('Step 3: Creating new POD...');
 
-    var podItemGuid = podItem.guid || podItem.Guid;
-    var podItemNumber = podItem.number || podItem.Number;
+      var podItem = client.createItem({
+        name: wizardData.pod.name,
+        category: {
+          guid: wizardData.pod.category.guid
+        },
+        description: 'Point of Delivery containing ' + createdRows.length + ' rows'
+      });
 
-    // Create BOM for POD (all rows)
+      podItemGuid = podItem.guid || podItem.Guid;
+      podItemNumber = podItem.number || podItem.Number;
+      Logger.log('✓ Created POD: ' + podItemNumber);
+    }
+
+    // Create/Update BOM for POD (all rows)
     var podBomLines = createdRows.map(function(row) {
       return {
         itemNumber: row.itemNumber,
@@ -2634,8 +2653,7 @@ function executePODPush(wizardData) {
     });
 
     syncBOMToArena(client, podItemGuid, podBomLines);
-
-    Logger.log('✓ Created POD: ' + podItemNumber);
+    Logger.log('✓ Synced BOM for POD ' + podItemNumber + ' (' + podBomLines.length + ' rows)');
 
     return {
       success: true,
