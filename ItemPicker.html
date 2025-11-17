@@ -681,7 +681,7 @@
         .withSuccessHandler(function(result) {
           if (result.success) {
             alert('✅ BOM Refresh Complete\n\n' + result.message);
-            google.script.host.close();
+            // Keep Item Picker open after refresh
           } else {
             alert('⚠️ BOM Refresh Issue\n\n' + result.message);
           }
