@@ -1402,7 +1402,7 @@
 
     // Success handler
     function onCreateSuccess(result) {
-      alert('Success!\n\nPOD structure created in Arena:\n• Created ' + result.racksCreated + ' rack(s)\n• Created ' + result.rowsCreated + ' row(s)\n• Created POD: ' + result.podItemNumber);
+      // Completion modal is shown server-side, just close the wizard
       google.script.host.close();
     }
 

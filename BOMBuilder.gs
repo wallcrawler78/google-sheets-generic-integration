@@ -2680,6 +2680,29 @@ function executePODPush(wizardData) {
     syncBOMToArena(client, podItemGuid, podBomLines);
     Logger.log('✓ Synced BOM for POD ' + podItemNumber + ' (' + podBomLines.length + ' rows)');
 
+    // Store results for completion modal
+    PropertiesService.getUserProperties().setProperty('podPush_results', JSON.stringify({
+      racksCreated: createdRacks.length,
+      rowsCreated: createdRows.length,
+      podItemNumber: podItemNumber,
+      podGuid: podItemGuid
+    }));
+
+    Logger.log('==========================================');
+    Logger.log('POD PUSH COMPLETE');
+    Logger.log('✓ Racks: ' + createdRacks.length);
+    Logger.log('✓ Rows: ' + createdRows.length);
+    Logger.log('✓ POD: ' + podItemNumber);
+    Logger.log('==========================================');
+
+    // Show completion modal
+    var ui = SpreadsheetApp.getUi();
+    var completionHtml = HtmlService.createHtmlOutputFromFile('PODPushCompleteModal')
+      .setWidth(500)
+      .setHeight(400);
+
+    ui.showModalDialog(completionHtml, 'POD Structure Complete');
+
     return {
       success: true,
       racksCreated: createdRacks.length,
@@ -2690,6 +2713,64 @@ function executePODPush(wizardData) {
 
   } catch (error) {
     Logger.log('ERROR in batch POD push: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Gets POD push results from PropertiesService
+ * Called by PODPushCompleteModal to display summary
+ * @return {Object} Result data with racksCreated, rowsCreated, podItemNumber, podGuid
+ */
+function getPODPushResults() {
+  var json = PropertiesService.getUserProperties().getProperty('podPush_results');
+  return json ? JSON.parse(json) : { racksCreated: 0, rowsCreated: 0, podItemNumber: '', podGuid: '' };
+}
+
+/**
+ * Opens the POD item in Arena web interface
+ * Called by PODPushCompleteModal when user clicks "Open POD in Arena" button
+ */
+function openPODInArena() {
+  try {
+    var json = PropertiesService.getUserProperties().getProperty('podPush_results');
+    if (!json) {
+      throw new Error('No POD push results found');
+    }
+
+    var results = JSON.parse(json);
+    var podGuid = results.podGuid;
+
+    if (!podGuid) {
+      throw new Error('No POD GUID found in results');
+    }
+
+    // Get Arena credentials to construct URL
+    var credentials = getArenaCredentials();
+    if (!credentials) {
+      throw new Error('Arena credentials not found');
+    }
+
+    // Construct Arena item URL
+    // API base is like: https://api.arenasolutions.com/v1
+    // Web URL is like: https://app.arenasolutions.com/workspace/{workspaceId}/item/{itemGuid}
+    var apiBase = credentials.apiBase;
+    var workspaceId = credentials.workspaceId;
+
+    // Extract domain from API base and convert to app domain
+    var domain = apiBase.replace(/^https?:\/\/api\./, 'https://app.').replace(/\/v\d+$/, '');
+    var itemUrl = domain + '/workspace/' + workspaceId + '/item/' + podGuid;
+
+    Logger.log('Opening Arena item URL: ' + itemUrl);
+
+    // Create HTML to open URL in new tab
+    var html = '<script>window.open("' + itemUrl + '", "_blank"); google.script.host.close();</script>';
+    var htmlOutput = HtmlService.createHtmlOutput(html);
+
+    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Opening Arena...');
+
+  } catch (error) {
+    Logger.log('Error opening POD in Arena: ' + error.message);
     throw error;
   }
 }
