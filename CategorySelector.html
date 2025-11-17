@@ -44,6 +44,8 @@
       border-bottom: 1px solid #eee;
       cursor: pointer;
       transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
     }
 
     .category-item:last-child {
@@ -57,6 +59,35 @@
     .category-item.selected {
       background-color: #2196F3;
       color: white;
+    }
+
+    .category-item.parent {
+      font-weight: 600;
+    }
+
+    .category-item.child {
+      padding-left: 35px;
+      background-color: #f9f9f9;
+    }
+
+    .category-item.hidden {
+      display: none;
+    }
+
+    .expand-icon {
+      width: 20px;
+      margin-right: 8px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .expand-icon.expanded {
+      transform: rotate(90deg);
+    }
+
+    .category-content {
+      flex: 1;
     }
 
     .category-name {
@@ -178,22 +209,98 @@
       .getCategorySelectorData();
 
     function renderCategories() {
-      // Render favorites
+      // Render favorites (keep flat list)
       if (favorites.length > 0) {
         document.getElementById('favoriteSection').style.display = 'block';
         var favoriteHtml = '';
         favorites.forEach(function(cat) {
-          favoriteHtml += createCategoryHtml(cat, true);
+          favoriteHtml += createFavoriteCategoryHtml(cat);
         });
         document.getElementById('favoriteList').innerHTML = favoriteHtml;
       }
 
-      // Render all categories
-      var allHtml = '';
-      categories.forEach(function(cat) {
-        allHtml += createCategoryHtml(cat, false);
-      });
+      // Render all categories hierarchically
+      var tree = buildCategoryTree(categories);
+      var allHtml = renderCategoryTree(tree);
       document.getElementById('categoryList').innerHTML = allHtml;
+    }
+
+    function buildCategoryTree(cats) {
+      var rootNodes = [];
+      var nodeMap = {};
+
+      // First pass: create nodes and map by full path
+      cats.forEach(function(cat) {
+        var node = {
+          category: cat,
+          children: [],
+          isParent: false
+        };
+        nodeMap[cat.fullPath] = node;
+      });
+
+      // Second pass: build tree structure
+      cats.forEach(function(cat) {
+        var node = nodeMap[cat.fullPath];
+        if (!cat.path || cat.path === '') {
+          // Root level category
+          rootNodes.push(node);
+        } else {
+          // Find parent by path
+          var parentPath = cat.path;
+          var parent = nodeMap[parentPath];
+          if (parent) {
+            parent.children.push(node);
+            parent.isParent = true;
+          } else {
+            // Parent not found, add as root
+            rootNodes.push(node);
+          }
+        }
+      });
+
+      return rootNodes;
+    }
+
+    function renderCategoryTree(nodes, level) {
+      level = level || 0;
+      var html = '';
+
+      nodes.forEach(function(node) {
+        var cat = node.category;
+        var hasChildren = node.children.length > 0;
+
+        if (hasChildren) {
+          // Parent node with expand/collapse
+          html += '<div class="category-item parent" id="parent-' + cat.guid + '" ' +
+                  'onclick="toggleExpand(\'' + cat.guid + '\')">' +
+                  '<span class="expand-icon" id="icon-' + cat.guid + '">▶</span>' +
+                  '<div class="category-content">' +
+                  '<div class="category-name">' + cat.name + '</div>' +
+                  '</div>' +
+                  '</div>';
+
+          // Render children (initially hidden)
+          node.children.forEach(function(child) {
+            html += createChildCategoryHtml(child.category, cat.guid);
+          });
+        } else {
+          // Leaf node (selectable)
+          html += createCategoryHtml(cat, false);
+        }
+      });
+
+      return html;
+    }
+
+    function createFavoriteCategoryHtml(cat) {
+      var pathHtml = cat.path ? '<div class="category-path">' + cat.path + '</div>' : '';
+      return '<div class="category-item" id="fav-' + cat.guid + '" ' +
+             'onclick="selectCategory(\'' + cat.guid + '\', \'' + cat.name.replace(/'/g, "\\'") + '\')">' +
+             '<div class="category-content">' +
+             '<div class="category-name">' + cat.name + '</div>' +
+             pathHtml +
+             '</div></div>';
     }
 
     function createCategoryHtml(cat, isFavorite) {
@@ -201,13 +308,45 @@
       var pathHtml = cat.path ? '<div class="category-path">' + cat.path + '</div>' : '';
 
       return '<div class="category-item" id="' + prefix + cat.guid + '" ' +
-             'onclick="selectCategory(\'' + cat.guid + '\', \'' + cat.name.replace(/'/g, "\\'") + '\', ' + isFavorite + ')">' +
+             'onclick="selectCategory(\'' + cat.guid + '\', \'' + cat.name.replace(/'/g, "\\'") + '\')">' +
+             '<div class="category-content">' +
              '<div class="category-name">' + cat.name + '</div>' +
              pathHtml +
-             '</div>';
+             '</div></div>';
     }
 
-    function selectCategory(guid, name, isFavorite) {
+    function createChildCategoryHtml(cat, parentGuid) {
+      var pathHtml = cat.path ? '<div class="category-path">' + cat.path + '</div>' : '';
+      return '<div class="category-item child hidden" id="cat-' + cat.guid + '" data-parent="' + parentGuid + '" ' +
+             'onclick="event.stopPropagation(); selectCategory(\'' + cat.guid + '\', \'' + cat.name.replace(/'/g, "\\'") + '\')">' +
+             '<div class="category-content">' +
+             '<div class="category-name">' + cat.name + '</div>' +
+             pathHtml +
+             '</div></div>';
+    }
+
+    function toggleExpand(guid) {
+      var icon = document.getElementById('icon-' + guid);
+      var children = document.querySelectorAll('[data-parent="' + guid + '"]');
+
+      var isExpanded = icon.classList.contains('expanded');
+
+      if (isExpanded) {
+        // Collapse
+        icon.classList.remove('expanded');
+        children.forEach(function(child) {
+          child.classList.add('hidden');
+        });
+      } else {
+        // Expand
+        icon.classList.add('expanded');
+        children.forEach(function(child) {
+          child.classList.remove('hidden');
+        });
+      }
+    }
+
+    function selectCategory(guid, name) {
       // Deselect all
       var items = document.querySelectorAll('.category-item');
       items.forEach(function(item) {
@@ -217,8 +356,10 @@
       // Select this one (both in favorites and all if it appears in both)
       var elem1 = document.getElementById('fav-' + guid);
       var elem2 = document.getElementById('cat-' + guid);
+      var elem3 = document.getElementById('parent-' + guid);
       if (elem1) elem1.classList.add('selected');
       if (elem2) elem2.classList.add('selected');
+      if (elem3) elem3.classList.add('selected');
 
       selectedCategory = {
         guid: guid,
