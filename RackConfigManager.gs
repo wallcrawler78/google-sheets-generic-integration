@@ -52,6 +52,8 @@ function createNewRackConfiguration() {
   }
 
   var rackItemNumber, rackItemName, rackItemDescription;
+  var arenaItem = null;  // Track the Arena item if linking to existing
+  var arenaBOM = null;   // Track the BOM if available
 
   if (linkResponse === ui.Button.YES) {
     // Option A: Select from Arena using Item Picker
@@ -82,8 +84,23 @@ function createNewRackConfiguration() {
         return;
       }
 
+      arenaItem = item;  // Store for later BOM fetch
       rackItemName = item.name || item.Name || rackName;
       rackItemDescription = item.description || item.Description || '';
+
+      // Fetch BOM from Arena if item has one
+      var itemGuid = item.guid || item.Guid;
+      if (itemGuid) {
+        Logger.log('Fetching BOM for item ' + rackItemNumber + ' (GUID: ' + itemGuid + ')');
+        try {
+          var bomResponse = arenaClient.makeRequest('/items/' + itemGuid + '/bom', { method: 'GET' });
+          arenaBOM = bomResponse.results || bomResponse.Results || [];
+          Logger.log('Fetched ' + arenaBOM.length + ' BOM lines from Arena');
+        } catch (bomError) {
+          Logger.log('Could not fetch BOM: ' + bomError.message);
+          // Continue without BOM - user can add manually or refresh later
+        }
+      }
 
     } catch (error) {
       ui.alert('Error', 'Failed to fetch item from Arena: ' + error.message, ui.ButtonSet.OK);
@@ -145,22 +162,31 @@ function createNewRackConfiguration() {
   metaRange.setFontColor('#1967d2');
 
   // Step 5b: Initialize rack in History tab
-  // Status starts as PLACEHOLDER, will be updated to SYNCED if BOM pulled from Arena
+  // Status depends on whether we linked to Arena item with BOM
+  var initialStatus = RACK_STATUS.PLACEHOLDER;
+  var arenaGuid = '';
+  if (arenaItem) {
+    arenaGuid = arenaItem.guid || arenaItem.Guid || '';
+    if (arenaBOM && arenaBOM.length > 0) {
+      initialStatus = RACK_STATUS.SYNCED;  // Has Arena data
+    }
+  }
+
   createRackHistorySummaryRow(rackItemNumber, rackItemName, {
-    status: RACK_STATUS.PLACEHOLDER,
-    arenaGuid: '',
+    status: initialStatus,
+    arenaGuid: arenaGuid,
     created: new Date(),
     lastRefresh: '',
-    lastSync: '',
+    lastSync: arenaGuid ? new Date() : '',
     lastPush: '',
     checksum: ''
   });
 
   // Log rack creation event
   addRackHistoryEvent(rackItemNumber, HISTORY_EVENT.RACK_CREATED, {
-    changesSummary: 'New rack configuration created',
-    details: 'Rack configuration sheet created: ' + rackItemName,
-    statusAfter: RACK_STATUS.PLACEHOLDER
+    changesSummary: 'New rack configuration created' + (arenaBOM && arenaBOM.length > 0 ? ' with BOM from Arena' : ''),
+    details: 'Rack configuration sheet created: ' + rackItemName + (arenaBOM && arenaBOM.length > 0 ? ' (' + arenaBOM.length + ' components)' : ''),
+    statusAfter: initialStatus
   });
 
   // Step 5c: Add History link in D1
@@ -193,27 +219,57 @@ function createNewRackConfiguration() {
   newSheet.setColumnWidth(5, 120);  // Lifecycle
   newSheet.setColumnWidth(6, 60);   // Qty
 
-  // Step 9: Add instructions in Row 3
-  newSheet.getRange(DATA_START_ROW, 1).setValue('Use Item Picker to add components →');
-  newSheet.getRange(DATA_START_ROW, 1, 1, headers.length).setFontStyle('italic').setFontColor('#666666');
+  // Step 9: Populate BOM if available, otherwise add instructions
+  if (arenaBOM && arenaBOM.length > 0) {
+    Logger.log('Populating BOM with ' + arenaBOM.length + ' items from Arena');
+
+    try {
+      // Populate BOM data to the sheet
+      populateRackBOMFromArena(newSheet, arenaBOM, arenaClient);
+
+      // Update status with checksum
+      var checksum = calculateBOMChecksum(newSheet);
+      updateRackHistorySummary(rackItemNumber, rackItemName, {
+        checksum: checksum
+      });
+
+      Logger.log('BOM populated successfully with checksum: ' + checksum);
+    } catch (bomPopError) {
+      Logger.log('Error populating BOM: ' + bomPopError.message);
+      // Fall back to showing instruction message
+      newSheet.getRange(DATA_START_ROW, 1).setValue('Use Item Picker to add components →');
+      newSheet.getRange(DATA_START_ROW, 1, 1, headers.length).setFontStyle('italic').setFontColor('#666666');
+    }
+  } else {
+    // No BOM available - show instruction message
+    newSheet.getRange(DATA_START_ROW, 1).setValue('Use Item Picker to add components →');
+    newSheet.getRange(DATA_START_ROW, 1, 1, headers.length).setFontStyle('italic').setFontColor('#666666');
+  }
 
   // Step 10: Set tab color to cascading blue
   var rackIndex = getAllRackConfigTabs().length;  // Get count including this new one
   var blueColor = getCascadingBlueColor(rackIndex - 1);  // Subtract 1 for zero-based index
   newSheet.setTabColor(blueColor);
 
-  // Step 10b: Update tab name with status indicator (red dot for placeholder)
+  // Step 10b: Update tab name with status indicator
   updateRackTabName(newSheet);
 
   // Step 11: Activate the new sheet
   newSheet.activate();
 
+  var successMessage = 'Rack configuration sheet created successfully!\n\n' +
+    'Sheet: "' + sheetName + '"\n' +
+    'Parent Item: ' + rackItemNumber + '\n\n';
+
+  if (arenaBOM && arenaBOM.length > 0) {
+    successMessage += '✓ BOM automatically populated with ' + arenaBOM.length + ' component(s) from Arena.';
+  } else {
+    successMessage += 'Use the Item Picker to add components to this rack.';
+  }
+
   ui.alert(
     'Rack Configuration Created',
-    'Rack configuration sheet created successfully!\n\n' +
-    'Sheet: "' + sheetName + '"\n' +
-    'Parent Item: ' + rackItemNumber + '\n\n' +
-    'Use the Item Picker to add components to this rack.',
+    successMessage,
     ui.ButtonSet.OK
   );
 }
@@ -453,4 +509,95 @@ function getCascadingBlueColor(index) {
 
   // Cycle through colors if we have more racks than colors
   return blueShades[index % blueShades.length];
+}
+
+/**
+ * Populates a rack BOM sheet with data from Arena
+ * Fetches full item details for each BOM line
+ * @param {Sheet} sheet - The rack configuration sheet
+ * @param {Array<Object>} arenaBOMLines - BOM lines from Arena API
+ * @param {ArenaAPIClient} arenaClient - Arena API client
+ */
+function populateRackBOMFromArena(sheet, arenaBOMLines, arenaClient) {
+  Logger.log('populateRackBOMFromArena: Populating ' + arenaBOMLines.length + ' BOM lines');
+
+  var rowData = [];
+
+  arenaBOMLines.forEach(function(line, index) {
+    try {
+      var bomItem = line.item || line.Item || {};
+      var itemNumber = bomItem.number || bomItem.Number || '';
+      var itemGuid = bomItem.guid || bomItem.Guid || '';
+      var quantity = line.quantity || line.Quantity || 1;
+
+      if (!itemNumber) {
+        Logger.log('populateRackBOMFromArena: Skipping line ' + (index + 1) + ' - no item number');
+        return;
+      }
+
+      Logger.log('populateRackBOMFromArena: Fetching details for ' + itemNumber);
+
+      // Fetch FULL item details
+      var fullItem = null;
+      if (itemGuid) {
+        try {
+          fullItem = arenaClient.makeRequest('/items/' + itemGuid, { method: 'GET' });
+        } catch (error) {
+          Logger.log('populateRackBOMFromArena: Error fetching by GUID: ' + error.message);
+        }
+      }
+
+      // Fallback to search by number
+      if (!fullItem) {
+        try {
+          fullItem = arenaClient.getItemByNumber(itemNumber);
+        } catch (error) {
+          Logger.log('populateRackBOMFromArena: Error fetching by number: ' + error.message);
+          fullItem = bomItem;  // Use lightweight data as last resort
+        }
+      }
+
+      // Extract fields
+      var name = fullItem.name || fullItem.Name || '';
+      var description = fullItem.description || fullItem.Description || '';
+      var categoryName = '';
+      if (fullItem.category || fullItem.Category) {
+        var cat = fullItem.category || fullItem.Category;
+        categoryName = cat.name || cat.Name || '';
+      }
+      var lifecycleName = '';
+      if (fullItem.lifecyclePhase || fullItem.LifecyclePhase) {
+        var lc = fullItem.lifecyclePhase || fullItem.LifecyclePhase;
+        lifecycleName = lc.name || lc.Name || '';
+      }
+
+      // Build row: [Item Number, Name, Description, Category, Lifecycle, Qty]
+      var row = [
+        itemNumber,
+        name,
+        description,
+        categoryName,
+        lifecycleName,
+        quantity
+      ];
+
+      // TODO: Add custom attribute columns if configured
+      // For now, just add the base 6 columns
+
+      rowData.push(row);
+
+      Logger.log('populateRackBOMFromArena: Added ' + itemNumber + ' - ' + name);
+
+    } catch (error) {
+      Logger.log('populateRackBOMFromArena: Error processing line ' + (index + 1) + ': ' + error.message);
+    }
+  });
+
+  // Write data to sheet starting at row 3
+  if (rowData.length > 0) {
+    sheet.getRange(DATA_START_ROW, 1, rowData.length, 6).setValues(rowData);
+    Logger.log('populateRackBOMFromArena: Wrote ' + rowData.length + ' rows to sheet');
+  } else {
+    Logger.log('populateRackBOMFromArena: No data to write');
+  }
 }
