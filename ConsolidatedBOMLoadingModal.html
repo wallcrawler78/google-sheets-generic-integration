@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      overflow: hidden;
+    }
+
+    .container {
+      text-align: center;
+      color: white;
+    }
+
+    .spinner-container {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 32px;
+    }
+
+    .spinner {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+    }
+
+    .spinner-1 {
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #fff;
+      animation: spin 1.5s linear infinite;
+    }
+
+    .spinner-2 {
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-right-color: rgba(255, 255, 255, 0.8);
+      animation: spin 2s linear infinite reverse;
+      width: 80%;
+      height: 80%;
+      top: 10%;
+      left: 10%;
+    }
+
+    .spinner-3 {
+      border: 4px solid rgba(255, 255, 255, 0.05);
+      border-bottom-color: rgba(255, 255, 255, 0.6);
+      animation: spin 2.5s linear infinite;
+      width: 60%;
+      height: 60%;
+      top: 20%;
+      left: 20%;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .message {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      animation: fadeInOut 2s ease-in-out infinite;
+    }
+
+    .submessage {
+      font-size: 16px;
+      opacity: 0.9;
+      font-weight: 400;
+    }
+
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .dots {
+      display: inline-block;
+    }
+
+    .dots span {
+      animation: blink 1.4s infinite;
+      animation-fill-mode: both;
+    }
+
+    .dots span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .dots span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes blink {
+      0%, 80%, 100% {
+        opacity: 0;
+      }
+      40% {
+        opacity: 1;
+      }
+    }
+
+    .timer {
+      margin-top: 24px;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner-container">
+      <div class="spinner spinner-1"></div>
+      <div class="spinner spinner-2"></div>
+      <div class="spinner spinner-3"></div>
+    </div>
+    <div class="message">Building Consolidated BOM<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+    <div class="submessage">Scanning overview and rack configurations</div>
+    <div class="timer" id="timer">Time elapsed: 0s</div>
+  </div>
+
+  <script>
+    var startTime = Date.now();
+
+    function updateTimer() {
+      var elapsed = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById('timer').textContent = 'Time elapsed: ' + elapsed + 's';
+    }
+
+    setInterval(updateTimer, 1000);
+
+    // Start the build process
+    google.script.run
+      .withSuccessHandler(onBuildComplete)
+      .withFailureHandler(onBuildError)
+      .buildConsolidatedBOM();
+
+    function onBuildComplete(result) {
+      // Close this loading modal
+      google.script.host.close();
+    }
+
+    function onBuildError(error) {
+      // Close this loading modal - error will be shown by the main function
+      google.script.host.close();
+    }
+  </script>
+</body>
+</html>

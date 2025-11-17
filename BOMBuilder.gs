@@ -564,7 +564,22 @@ function consolidateBOM(rackSheetNames) {
  * Creates a new sheet with consolidated BOM from overview layout
  * Scans overview sheet for rack placements and builds hierarchical BOM
  */
+/**
+ * Shows loading modal and starts consolidated BOM build process
+ */
 function createConsolidatedBOMSheet() {
+  var html = HtmlService.createHtmlOutputFromFile('ConsolidatedBOMLoadingModal')
+    .setWidth(400)
+    .setHeight(300);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Building Consolidated BOM');
+}
+
+/**
+ * Builds the consolidated BOM (called by loading modal)
+ * Creates the sheet and stores results for completion modal
+ */
+function buildConsolidatedBOM() {
   var ui = SpreadsheetApp.getUi();
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -581,32 +596,17 @@ function createConsolidatedBOMSheet() {
   }
 
   if (!overviewSheet) {
-    ui.alert('No Overview Sheet',
-      'Could not find an Overview sheet.\n\n' +
-      'Please create an overview layout sheet first.',
-      ui.ButtonSet.OK);
-    return;
+    throw new Error('Could not find an Overview sheet. Please create an overview layout sheet first.');
   }
 
   Logger.log('Using overview sheet: ' + overviewSheet.getName());
 
   // Build consolidated BOM from overview
   try {
-    ui.alert('Building Consolidated BOM',
-      'Scanning overview layout and rack configurations...\nThis may take a moment.',
-      ui.ButtonSet.OK);
-
     var bomData = buildConsolidatedBOMFromOverview(overviewSheet);
 
     if (!bomData || bomData.lines.length === 0) {
-      ui.alert('No Data',
-        'No BOM data could be generated from the overview.\n\n' +
-        'Make sure:\n' +
-        '1. Overview sheet has rack items placed\n' +
-        '2. Rack configuration tabs exist for those racks\n' +
-        '3. Rack configs have child items',
-        ui.ButtonSet.OK);
-      return;
+      throw new Error('No BOM data could be generated from the overview.\n\nMake sure:\n1. Overview sheet has rack items placed\n2. Rack configuration tabs exist for those racks\n3. Rack configs have child items');
     }
 
     // Create new sheet
@@ -693,22 +693,47 @@ function createConsolidatedBOMSheet() {
     spreadsheet.setActiveSheet(newSheet);
     spreadsheet.moveActiveSheet(spreadsheet.getNumSheets());
 
-    // Show success message
-    ui.alert('Success!',
-      'Consolidated BOM created successfully!\n\n' +
-      'Total unique items: ' + bomData.totalUniqueItems + '\n' +
-      'Total rack instances: ' + bomData.totalRacks + '\n' +
-      'BOM lines: ' + bomData.lines.length,
-      ui.ButtonSet.OK);
+    // Store results for completion modal
+    PropertiesService.getUserProperties().setProperty('consolidatedBOM_results', JSON.stringify({
+      totalUniqueItems: bomData.totalUniqueItems,
+      totalRacks: bomData.totalRacks,
+      bomLines: bomData.lines.length
+    }));
 
-    // Activate the new sheet
-    newSheet.activate();
+    Logger.log('✓ Consolidated BOM created successfully with ' + bomData.lines.length + ' lines');
+
+    // Show completion modal
+    var completionHtml = HtmlService.createHtmlOutputFromFile('ConsolidatedBOMCompleteModal')
+      .setWidth(500)
+      .setHeight(400);
+
+    ui.showModalDialog(completionHtml, 'Consolidated BOM Complete');
 
   } catch (error) {
     Logger.log('Error creating consolidated BOM: ' + error.message + '\n' + error.stack);
-    ui.alert('Error',
-      'Failed to create consolidated BOM:\n\n' + error.message,
-      ui.ButtonSet.OK);
+    throw error;
+  }
+}
+
+/**
+ * Gets consolidated BOM results from PropertiesService
+ * Called by completion modal to display summary
+ * @return {Object} Result data with totalUniqueItems, totalRacks, bomLines
+ */
+function getConsolidatedBOMResults() {
+  var json = PropertiesService.getUserProperties().getProperty('consolidatedBOM_results');
+  return json ? JSON.parse(json) : { totalUniqueItems: 0, totalRacks: 0, bomLines: 0 };
+}
+
+/**
+ * Navigates to the Consolidated BOM sheet
+ * Called by completion modal when user clicks "Go to Consolidated BOM" button
+ */
+function navigateToConsolidatedBOM() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Consolidated BOM');
+  if (sheet) {
+    sheet.activate();
   }
 }
 
