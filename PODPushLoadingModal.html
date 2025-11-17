@@ -110,25 +110,12 @@
       40% { opacity: 1; }
     }
 
-    .icons {
+    .timer {
       margin-top: 24px;
-      font-size: 32px;
-      opacity: 0.8;
-    }
-
-    .icon {
-      display: inline-block;
-      margin: 0 8px;
-      animation: bounce 1s ease-in-out infinite;
-    }
-
-    .icon:nth-child(1) { animation-delay: 0s; }
-    .icon:nth-child(2) { animation-delay: 0.2s; }
-    .icon:nth-child(3) { animation-delay: 0.4s; }
-
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
+      font-size: 18px;
+      opacity: 0.9;
+      font-weight: 500;
+      font-family: 'Monaco', 'Courier New', monospace;
     }
   </style>
 </head>
@@ -148,16 +135,31 @@
       Scanning sheets, checking Arena, and comparing notes
     </div>
 
-    <div class="icons">
-      <span class="icon">📋</span>
-      <span class="icon">🔍</span>
-      <span class="icon">📊</span>
+    <div class="timer">
+      Wait time: <span id="timerDisplay">0:00</span>
     </div>
   </div>
 
   <script>
+    // Timer tracking
+    var startTime = new Date();
+    var timerInterval = null;
+
+    function updateTimer() {
+      var now = new Date();
+      var elapsed = Math.floor((now - startTime) / 1000); // seconds
+      var minutes = Math.floor(elapsed / 60);
+      var seconds = elapsed % 60;
+      var display = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+      document.getElementById('timerDisplay').textContent = display;
+    }
+
     // Automatically start preparing data when modal loads
     window.onload = function() {
+      // Start timer
+      timerInterval = setInterval(updateTimer, 1000);
+      updateTimer(); // Initial update
+
       google.script.run
         .withSuccessHandler(onDataReady)
         .withFailureHandler(onError)
@@ -165,16 +167,29 @@
     };
 
     function onDataReady(wizardData) {
-      console.log('Data ready, showing wizard...');
+      console.log('Data ready, transitioning to wizard...');
 
-      // Close this loading modal
-      google.script.host.close();
+      // Stop timer
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
 
-      // Show the main wizard with the prepared data
-      google.script.run.showPODPushWizardWithData(wizardData);
+      // Don't close - instead tell server to replace this modal with the wizard
+      // Server will close this modal and immediately open the wizard
+      google.script.run
+        .withSuccessHandler(function() {
+          // Server has opened wizard, we can close now
+          google.script.host.close();
+        })
+        .withFailureHandler(onError)
+        .transitionToWizard(wizardData);
     }
 
     function onError(error) {
+      // Stop timer
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
       alert('Error preparing POD structure:\n\n' + error.message);
       google.script.host.close();
     }

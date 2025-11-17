@@ -658,7 +658,8 @@
             <td><span class="status-badge existing">✓ Exists</span></td>
             <td><strong>${rack.itemNumber}</strong></td>
             <td>${rack.name || ''}</td>
-            <td colspan="2" style="font-style: italic; color: #137333;">Already exists in Arena</td>
+            <td style="font-style: italic;">${rack.description || 'Already exists in Arena'}</td>
+            <td style="font-weight: 500;">${rack.category || '(No category)'}</td>
             <td style="text-align: center;">${rack.childCount || 0}</td>
           `;
           tbody.appendChild(row);

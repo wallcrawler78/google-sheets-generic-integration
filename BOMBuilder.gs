@@ -2272,14 +2272,22 @@ function preparePODWizardDataForModal() {
     }
 
     if (existsInArena) {
+      // Extract category info from Arena item
+      var categoryName = '';
+      if (arenaItem.category || arenaItem.Category) {
+        var cat = arenaItem.category || arenaItem.Category;
+        categoryName = cat.name || cat.Name || '';
+      }
+
       existingRacks.push({
         itemNumber: itemNumber,
         name: arenaItem.name || arenaItem.Name || rackConfig.metadata.itemName,
         description: arenaItem.description || arenaItem.Description || rackConfig.metadata.description || '',
+        category: categoryName,
         childCount: rackConfig.childCount,
         guid: arenaItem.guid || arenaItem.Guid
       });
-      Logger.log('→ Added ' + itemNumber + ' to EXISTING racks list');
+      Logger.log('→ Added ' + itemNumber + ' to EXISTING racks list (category: ' + categoryName + ')');
     } else {
       // Doesn't exist in Arena - placeholder
       Logger.log('→ Adding ' + itemNumber + ' to PLACEHOLDER list');
