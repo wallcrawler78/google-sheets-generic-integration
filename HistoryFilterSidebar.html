@@ -29,19 +29,23 @@
 
     .help-icon {
       cursor: pointer;
-      font-size: 20px;
-      color: #5f6368;
-      width: 28px;
-      height: 28px;
+      font-size: 22px;
+      color: #1a73e8;
+      font-weight: bold;
+      width: 32px;
+      height: 32px;
       display: flex;
       align-items: center;
       justify-content: center;
       border-radius: 50%;
-      transition: background-color 0.2s;
+      border: 2px solid #1a73e8;
+      transition: all 0.2s;
+      flex-shrink: 0;
     }
 
     .help-icon:hover {
-      background-color: #e8f0fe;
+      background-color: #1a73e8;
+      color: white;
     }
 
     .section {
@@ -243,7 +247,7 @@
 <body>
   <div class="header">
     <h2>📊 Rack History Filter</h2>
-    <div class="help-icon" onclick="showHelp()">❔</div>
+    <div class="help-icon" onclick="showHelp()" title="Help & Documentation">?</div>
   </div>
 
   <div class="section">
@@ -353,38 +357,34 @@
     function loadStats() {
       google.script.run
         .withSuccessHandler(function(stats) {
+          console.log('Stats received:', stats);
           var container = document.getElementById('statsContainer');
           container.innerHTML = '';
-
-          // Total racks
-          addStat(container, 'Total Racks', stats.total, '');
-
-          // Status counts
-          if (stats.synced > 0) {
-            addStat(container, '🟢 Synced', stats.synced, 'synced');
-          }
-          if (stats.outOfSync > 0) {
-            addStat(container, '🟡 Out of Sync', stats.outOfSync, 'out-of-sync');
-          }
-          if (stats.localModified > 0) {
-            addStat(container, '🟠 Locally Modified', stats.localModified, 'local-modified');
-          }
-          if (stats.placeholder > 0) {
-            addStat(container, '🔴 Placeholder', stats.placeholder, 'placeholder');
-          }
-          if (stats.error > 0) {
-            addStat(container, '❌ Errors', stats.error, 'error');
-          }
 
           // If no racks
           if (stats.total === 0) {
             container.innerHTML = '<div class="loading">No racks found</div>';
+            return;
+          }
+
+          // Total racks
+          addStat(container, 'Total Racks', stats.total, '');
+
+          // Always show all status types (even if 0) for clarity
+          addStat(container, '🟢 Synced', stats.synced || 0, 'synced');
+          addStat(container, '🟡 Out of Sync', stats.outOfSync || 0, 'out-of-sync');
+          addStat(container, '🟠 Locally Modified', stats.localModified || 0, 'local-modified');
+          addStat(container, '🔴 Placeholder', stats.placeholder || 0, 'placeholder');
+
+          // Only show errors if > 0
+          if (stats.error > 0) {
+            addStat(container, '❌ Errors', stats.error, 'error');
           }
         })
         .withFailureHandler(function(error) {
           console.error('Error loading stats:', error);
           var container = document.getElementById('statsContainer');
-          container.innerHTML = '<div class="error">Error loading stats</div>';
+          container.innerHTML = '<div class="error">Error loading stats: ' + error.message + '</div>';
         })
         .getHistoryStats();
     }
