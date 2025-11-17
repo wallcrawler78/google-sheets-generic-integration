@@ -697,11 +697,12 @@
         <table>
           <thead>
             <tr>
-              <th style="width: 12%;">Status</th>
-              <th style="width: 13%;">Part Number</th>
-              <th style="width: 20%;">Name</th>
-              <th style="width: 25%;">Description</th>
-              <th style="width: 20%;">Category</th>
+              <th style="width: 10%;">Status</th>
+              <th style="width: 12%;">Part Number</th>
+              <th style="width: 15%;">Name</th>
+              <th style="width: 20%;">Description</th>
+              <th style="width: 18%;">Category</th>
+              <th style="width: 15%;">Row - Position</th>
               <th style="width: 10%;">Items</th>
             </tr>
           </thead>
@@ -723,10 +724,9 @@
         <table>
           <thead>
             <tr>
-              <th style="width: 15%;">Row Number</th>
-              <th style="width: 25%;">Name</th>
-              <th style="width: 25%;">Category</th>
-              <th style="width: 25%;">Positions</th>
+              <th style="width: 20%;">Row Number</th>
+              <th style="width: 35%;">Name</th>
+              <th style="width: 35%;">Category</th>
               <th style="width: 10%;">Racks</th>
             </tr>
           </thead>
@@ -883,12 +883,14 @@
         wizardData.existingRacks.forEach((rack) => {
           const row = document.createElement('tr');
           row.className = 'existing-rack-row';
+          const rowPosition = rack.row && rack.position ? `Row ${rack.row} - Pos ${rack.position}` : '-';
           row.innerHTML = `
             <td><span class="status-badge existing">✓ Exists</span></td>
             <td><strong>${rack.itemNumber}</strong></td>
             <td>${rack.name || ''}</td>
             <td style="font-style: italic;">${rack.description || 'Already exists in Arena'}</td>
             <td style="font-weight: 500;">${rack.category || '(No category)'}</td>
+            <td style="text-align: center; color: #5f6368;">${rowPosition}</td>
             <td style="text-align: center;">${rack.childCount || 0}</td>
           `;
           tbody.appendChild(row);
@@ -898,6 +900,7 @@
       // Then render placeholder racks (editable)
       wizardData.racks.forEach((rack, index) => {
         const row = document.createElement('tr');
+        const rowPosition = rack.row && rack.position ? `Row ${rack.row} - Pos ${rack.position}` : '-';
         row.innerHTML = `
           <td><span class="status-badge new">New</span></td>
           <td><strong>${rack.itemNumber}</strong></td>
@@ -923,6 +926,7 @@
               <button class="btn-select-category" onclick="selectRackCategory(${index})">Select Category</button>
             </div>
           </td>
+          <td style="text-align: center; color: #5f6368; font-weight: 500;">${rowPosition}</td>
           <td style="text-align: center; color: #5f6368;">${rack.childCount || 0}</td>
         `;
         tbody.appendChild(row);
@@ -936,7 +940,6 @@
 
       wizardData.rows.forEach((row, index) => {
         const tr = document.createElement('tr');
-        const positionsText = row.positions.map(p => p.position).join(', ');
         tr.innerHTML = `
           <td><strong>${row.rowNumber}</strong></td>
           <td>
@@ -954,7 +957,6 @@
               <button class="btn-select-category" onclick="selectRowCategory(${index})">Select Category</button>
             </div>
           </td>
-          <td style="color: #5f6368; font-size: 13px;">${positionsText}</td>
           <td style="text-align: center; color: #5f6368;">${row.positions.length}</td>
         `;
         tbody.appendChild(tr);
