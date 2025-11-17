@@ -18,7 +18,6 @@ var HIST_SUMMARY_LAST_REFRESH_COL = 6;  // F: Last Refresh
 var HIST_SUMMARY_LAST_SYNC_COL = 7;     // G: Last Sync
 var HIST_SUMMARY_LAST_PUSH_COL = 8;     // H: Last Push
 var HIST_SUMMARY_CHECKSUM_COL = 9;      // I: BOM Checksum
-var HIST_SUMMARY_ACTIONS_COL = 10;      // J: Actions
 
 // Detail section columns (below summary rows, separated by blank row)
 var HIST_DETAIL_TIMESTAMP_COL = 1;      // A: Timestamp
@@ -74,8 +73,7 @@ function getOrCreateRackHistoryTab() {
     'Last Refresh',
     'Last Sync',
     'Last Push',
-    'BOM Checksum',
-    'Actions'
+    'BOM Checksum'
   ];
 
   var headerRange = historySheet.getRange(1, 1, 1, summaryHeaders.length);
@@ -99,7 +97,6 @@ function getOrCreateRackHistoryTab() {
   historySheet.setColumnWidth(HIST_SUMMARY_LAST_SYNC_COL, 150);     // Last Sync
   historySheet.setColumnWidth(HIST_SUMMARY_LAST_PUSH_COL, 150);     // Last Push
   historySheet.setColumnWidth(HIST_SUMMARY_CHECKSUM_COL, 300);      // Checksum
-  historySheet.setColumnWidth(HIST_SUMMARY_ACTIONS_COL, 100);       // Actions
 
   // Add separator row (Row 2)
   historySheet.getRange(2, 1, 1, summaryHeaders.length).setBackground('#f0f0f0');
@@ -239,8 +236,7 @@ function createRackHistorySummaryRow(itemNumber, rackName, metadata) {
     metadata.lastRefresh || '',
     metadata.lastSync || '',
     metadata.lastPush || '',
-    metadata.checksum || '',
-    '📋 View'  // Action link placeholder
+    metadata.checksum || ''
   ];
 
   historySheet.getRange(insertRow, 1, 1, summaryRow.length).setValues([summaryRow]);
