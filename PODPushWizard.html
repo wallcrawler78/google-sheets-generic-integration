@@ -465,6 +465,187 @@
       color: #202124;
       font-weight: 600;
     }
+
+    /* Category Selector Overlay */
+    .category-selector-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .category-selector-overlay.active {
+      display: flex;
+    }
+
+    .category-selector-panel {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .category-selector-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .category-selector-header h3 {
+      font-size: 18px;
+      color: #333;
+      margin: 0 0 8px 0;
+    }
+
+    .category-selector-subtitle {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .category-selector-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .category-favorite-section {
+      margin-bottom: 20px;
+    }
+
+    .category-section-title {
+      font-weight: bold;
+      color: #666;
+      font-size: 12px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      padding: 0 5px;
+    }
+
+    .category-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fafafa;
+    }
+
+    .category-item {
+      padding: 12px 15px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+    }
+
+    .category-item:last-child {
+      border-bottom: none;
+    }
+
+    .category-item:hover {
+      background-color: #e3f2fd;
+    }
+
+    .category-item.selected {
+      background-color: #2196F3;
+      color: white;
+    }
+
+    .category-item.parent {
+      font-weight: 600;
+    }
+
+    .category-item.child {
+      padding-left: 35px;
+      background-color: #f9f9f9;
+    }
+
+    .category-item.hidden {
+      display: none;
+    }
+
+    .expand-icon {
+      width: 20px;
+      margin-right: 8px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .expand-icon.expanded {
+      transform: rotate(90deg);
+    }
+
+    .category-content {
+      flex: 1;
+    }
+
+    .category-name {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .category-path {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .category-item.selected .category-path {
+      color: rgba(255,255,255,0.8);
+    }
+
+    .category-selector-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .btn-category-cancel {
+      background-color: #f0f0f0;
+      color: #333;
+      padding: 8px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-category-cancel:hover {
+      background-color: #e0e0e0;
+    }
+
+    .btn-category-ok {
+      background-color: #2196F3;
+      color: white;
+      padding: 8px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-category-ok:hover {
+      background-color: #1976D2;
+    }
+
+    .btn-category-ok:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -624,6 +805,33 @@
     </button>
   </div>
 
+  <!-- Category Selector Overlay -->
+  <div class="category-selector-overlay" id="categorySelectorOverlay">
+    <div class="category-selector-panel">
+      <div class="category-selector-header">
+        <h3 id="categorySelectorTitle">Select Category</h3>
+        <div class="category-selector-subtitle" id="categorySelectorSubtitle"></div>
+      </div>
+
+      <div class="category-selector-body">
+        <div id="categoryFavoriteSection" class="category-favorite-section" style="display: none;">
+          <div class="category-section-title">⭐ Favorite Categories</div>
+          <div class="category-list" id="categoryFavoriteList"></div>
+        </div>
+
+        <div>
+          <div class="category-section-title">All Categories</div>
+          <div class="category-list" id="categoryCategoryList"></div>
+        </div>
+      </div>
+
+      <div class="category-selector-footer">
+        <button class="btn-category-cancel" onclick="closeCategorySelector()">Cancel</button>
+        <button class="btn-category-ok" id="categorySelectorOkBtn" onclick="confirmCategorySelection()" disabled>OK</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentStage = 1;
     let wizardData = {
@@ -636,6 +844,11 @@
     };
     let selectedCategoryRow = null;
 
+    // Category selector variables
+    let categories = [];
+    let favorites = [];
+    let selectedCategory = null;
+
     // Initialize wizard with data from server
     function initializeWizard(data) {
       console.log('Initializing wizard with data:', data);
@@ -643,6 +856,21 @@
       renderRacksTable();
       renderRowsTable();
       updateSummary();
+      loadCategories(); // Load categories for the selector
+    }
+
+    // Load categories from server
+    function loadCategories() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          categories = data.categories;
+          favorites = data.favorites;
+          console.log('Categories loaded:', categories.length);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading categories:', error);
+        })
+        .getCategorySelectorData();
     }
 
     // Render racks table
@@ -747,110 +975,216 @@
     function selectRackCategory(index) {
       selectedCategoryRow = { type: 'rack', index: index };
       const rackNumber = wizardData.racks[index].itemNumber;
-
-      // Clear any previous selection
-      google.script.run.setCategorySelection(null);
-
-      // Show category selector (may close wizard due to modal nesting)
-      google.script.run
-        .withSuccessHandler(function() {
-          // Poll for category selection
-          pollForCategorySelection();
-        })
-        .withFailureHandler(onError)
-        .showCategorySelector('Select Category', 'Choose category for rack ' + rackNumber);
-    }
-
-    var pollInterval = null;
-    var pollAttempts = 0;
-
-    function pollForCategorySelection() {
-      pollAttempts = 0;
-      clearInterval(pollInterval);
-
-      pollInterval = setInterval(function() {
-        pollAttempts++;
-
-        // Try to get selection
-        google.script.run
-          .withSuccessHandler(function(category) {
-            if (category) {
-              // Got a selection!
-              clearInterval(pollInterval);
-              onCategorySelected(category);
-            } else if (pollAttempts > 30) {
-              // Timeout after 30 seconds
-              clearInterval(pollInterval);
-              console.log('Category selection timeout');
-            }
-          })
-          .withFailureHandler(function(error) {
-            clearInterval(pollInterval);
-            onError(error);
-          })
-          .getCategorySelection();
-      }, 1000); // Poll every second
+      showCategorySelectorOverlay('Select Category', 'Choose category for rack ' + rackNumber);
     }
 
     // Select category for row
     function selectRowCategory(index) {
       selectedCategoryRow = { type: 'row', index: index };
       const rowNumber = wizardData.rows[index].rowNumber;
-
-      // Clear any previous selection
-      google.script.run.setCategorySelection(null);
-
-      // Show category selector (may close wizard due to modal nesting)
-      google.script.run
-        .withSuccessHandler(function() {
-          // Poll for category selection
-          pollForCategorySelection();
-        })
-        .withFailureHandler(onError)
-        .showCategorySelector('Select Category', 'Choose category for Row ' + rowNumber);
+      showCategorySelectorOverlay('Select Category', 'Choose category for Row ' + rowNumber);
     }
 
     // Select category for POD
     function selectPODCategory() {
       selectedCategoryRow = { type: 'pod', index: null };
-
-      // Clear any previous selection
-      google.script.run.setCategorySelection(null);
-
-      // Show category selector (may close wizard due to modal nesting)
-      google.script.run
-        .withSuccessHandler(function() {
-          // Poll for category selection
-          pollForCategorySelection();
-        })
-        .withFailureHandler(onError)
-        .showCategorySelector('Select Category', 'Choose category for POD');
+      showCategorySelectorOverlay('Select Category', 'Choose category for POD');
     }
 
-    // Category selected callback
-    function onCategorySelected(category) {
-      console.log('Category selected:', category);
+    // Show category selector overlay
+    function showCategorySelectorOverlay(title, subtitle) {
+      document.getElementById('categorySelectorTitle').textContent = title;
+      document.getElementById('categorySelectorSubtitle').textContent = subtitle;
+      selectedCategory = null;
+      document.getElementById('categorySelectorOkBtn').disabled = true;
+      renderCategorySelector();
+      document.getElementById('categorySelectorOverlay').classList.add('active');
+    }
 
-      if (!selectedCategoryRow) return;
-      if (!category) return; // User cancelled
+    // Close category selector overlay
+    function closeCategorySelector() {
+      document.getElementById('categorySelectorOverlay').classList.remove('active');
+      selectedCategory = null;
+      selectedCategoryRow = null;
+    }
 
-      if (selectedCategoryRow.type === 'rack') {
-        const idx = selectedCategoryRow.index;
-        wizardData.racks[idx].category = category;
-        document.getElementById('rackCategory' + idx).textContent = category.name;
-        document.getElementById('rackCategory' + idx).classList.add('selected');
-      } else if (selectedCategoryRow.type === 'row') {
-        const idx = selectedCategoryRow.index;
-        wizardData.rows[idx].category = category;
-        document.getElementById('rowCategory' + idx).textContent = category.name;
-        document.getElementById('rowCategory' + idx).classList.add('selected');
-      } else if (selectedCategoryRow.type === 'pod') {
-        wizardData.pod.category = category;
-        document.getElementById('podCategoryDisplay').textContent = category.name;
-        document.getElementById('podCategoryDisplay').classList.add('selected');
+    // Confirm category selection
+    function confirmCategorySelection() {
+      if (!selectedCategory) return;
+
+      if (selectedCategoryRow) {
+        if (selectedCategoryRow.type === 'rack') {
+          const idx = selectedCategoryRow.index;
+          wizardData.racks[idx].category = selectedCategory;
+          document.getElementById('rackCategory' + idx).textContent = selectedCategory.name;
+          document.getElementById('rackCategory' + idx).classList.add('selected');
+        } else if (selectedCategoryRow.type === 'row') {
+          const idx = selectedCategoryRow.index;
+          wizardData.rows[idx].category = selectedCategory;
+          document.getElementById('rowCategory' + idx).textContent = selectedCategory.name;
+          document.getElementById('rowCategory' + idx).classList.add('selected');
+        } else if (selectedCategoryRow.type === 'pod') {
+          wizardData.pod.category = selectedCategory;
+          document.getElementById('podCategoryDisplay').textContent = selectedCategory.name;
+          document.getElementById('podCategoryDisplay').classList.add('selected');
+        }
       }
 
-      selectedCategoryRow = null;
+      closeCategorySelector();
+    }
+
+    // Render category selector
+    function renderCategorySelector() {
+      // Render favorites
+      if (favorites.length > 0) {
+        document.getElementById('categoryFavoriteSection').style.display = 'block';
+        let favoriteHtml = '';
+        favorites.forEach(function(cat) {
+          favoriteHtml += createFavoriteCategoryHtml(cat);
+        });
+        document.getElementById('categoryFavoriteList').innerHTML = favoriteHtml;
+      } else {
+        document.getElementById('categoryFavoriteSection').style.display = 'none';
+      }
+
+      // Render all categories hierarchically
+      const tree = buildCategoryTree(categories);
+      const allHtml = renderCategoryTree(tree);
+      document.getElementById('categoryCategoryList').innerHTML = allHtml;
+    }
+
+    function buildCategoryTree(cats) {
+      const rootNodes = [];
+      const nodeMap = {};
+
+      // First pass: create nodes and map by full path
+      cats.forEach(function(cat) {
+        const node = {
+          category: cat,
+          children: [],
+          isParent: false
+        };
+        nodeMap[cat.fullPath] = node;
+      });
+
+      // Second pass: build tree structure
+      cats.forEach(function(cat) {
+        const node = nodeMap[cat.fullPath];
+        if (!cat.path || cat.path === '') {
+          rootNodes.push(node);
+        } else {
+          const parentPath = cat.path;
+          const parent = nodeMap[parentPath];
+          if (parent) {
+            parent.children.push(node);
+            parent.isParent = true;
+          } else {
+            rootNodes.push(node);
+          }
+        }
+      });
+
+      return rootNodes;
+    }
+
+    function renderCategoryTree(nodes) {
+      let html = '';
+      nodes.forEach(function(node) {
+        const cat = node.category;
+        const hasChildren = node.children.length > 0;
+
+        if (hasChildren) {
+          // Parent node with expand/collapse
+          html += '<div class="category-item parent" id="parent-' + cat.guid + '" ' +
+                  'onclick="toggleExpandCategory(\'' + cat.guid + '\')">' +
+                  '<span class="expand-icon" id="icon-' + cat.guid + '">▶</span>' +
+                  '<div class="category-content">' +
+                  '<div class="category-name">' + cat.name + '</div>' +
+                  '</div>' +
+                  '</div>';
+
+          // Render children (initially hidden)
+          node.children.forEach(function(child) {
+            html += createChildCategoryHtml(child.category, cat.guid);
+          });
+        } else {
+          // Leaf node (selectable)
+          html += createCategoryItemHtml(cat, false);
+        }
+      });
+      return html;
+    }
+
+    function createFavoriteCategoryHtml(cat) {
+      const pathHtml = cat.path ? '<div class="category-path">' + cat.path + '</div>' : '';
+      return '<div class="category-item" id="fav-' + cat.guid + '" ' +
+             'onclick="selectCategoryItem(\'' + cat.guid + '\', \'' + cat.name.replace(/'/g, "\\'") + '\')">' +
+             '<div class="category-content">' +
+             '<div class="category-name">' + cat.name + '</div>' +
+             pathHtml +
+             '</div></div>';
+    }
+
+    function createCategoryItemHtml(cat, isFavorite) {
+      const prefix = isFavorite ? 'fav-' : 'cat-';
+      const pathHtml = cat.path ? '<div class="category-path">' + cat.path + '</div>' : '';
+      return '<div class="category-item" id="' + prefix + cat.guid + '" ' +
+             'onclick="selectCategoryItem(\'' + cat.guid + '\', \'' + cat.name.replace(/'/g, "\\'") + '\')">' +
+             '<div class="category-content">' +
+             '<div class="category-name">' + cat.name + '</div>' +
+             pathHtml +
+             '</div></div>';
+    }
+
+    function createChildCategoryHtml(cat, parentGuid) {
+      const pathHtml = cat.path ? '<div class="category-path">' + cat.path + '</div>' : '';
+      return '<div class="category-item child hidden" id="cat-' + cat.guid + '" data-parent="' + parentGuid + '" ' +
+             'onclick="event.stopPropagation(); selectCategoryItem(\'' + cat.guid + '\', \'' + cat.name.replace(/'/g, "\\'") + '\')">' +
+             '<div class="category-content">' +
+             '<div class="category-name">' + cat.name + '</div>' +
+             pathHtml +
+             '</div></div>';
+    }
+
+    function toggleExpandCategory(guid) {
+      const icon = document.getElementById('icon-' + guid);
+      const children = document.querySelectorAll('[data-parent="' + guid + '"]');
+      const isExpanded = icon.classList.contains('expanded');
+
+      if (isExpanded) {
+        icon.classList.remove('expanded');
+        children.forEach(function(child) {
+          child.classList.add('hidden');
+        });
+      } else {
+        icon.classList.add('expanded');
+        children.forEach(function(child) {
+          child.classList.remove('hidden');
+        });
+      }
+    }
+
+    function selectCategoryItem(guid, name) {
+      // Deselect all
+      const items = document.querySelectorAll('.category-item');
+      items.forEach(function(item) {
+        item.classList.remove('selected');
+      });
+
+      // Select this one
+      const elem1 = document.getElementById('fav-' + guid);
+      const elem2 = document.getElementById('cat-' + guid);
+      const elem3 = document.getElementById('parent-' + guid);
+      if (elem1) elem1.classList.add('selected');
+      if (elem2) elem2.classList.add('selected');
+      if (elem3) elem3.classList.add('selected');
+
+      selectedCategory = {
+        guid: guid,
+        name: name
+      };
+
+      document.getElementById('categorySelectorOkBtn').disabled = false;
     }
 
     // Navigation
