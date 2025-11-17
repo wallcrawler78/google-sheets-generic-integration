@@ -40,6 +40,9 @@ function onOpen(e) {
       .addItem('Check All Rack Statuses', 'checkAllRackStatuses')
       .addItem('Mark Current Rack as Synced', 'markCurrentRackAsSynced')
       .addSeparator()
+      .addItem('Migrate Rack Metadata to History', 'migrateRackMetadataToHistory')
+      .addItem('Clear Old Metadata (Advanced)', 'clearOldRackMetadata')
+      .addSeparator()
       .addItem('Repair POD/Row BOMs', 'repairPODAndRowBOMs'))
     .addSeparator()
     .addItem('Test Connection', 'testArenaConnection')
@@ -840,6 +843,9 @@ function refreshCurrentRackBOM() {
   var metadata = getRackConfigMetadata(sheet);
   Logger.log('Refreshing BOM for rack: ' + metadata.itemNumber);
 
+  // Get Arena GUID from History tab
+  var arenaGuid = getRackArenaGuidFromHistory(metadata.itemNumber);
+
   try {
     // Fetch current BOM from Arena
     var arenaClient = new ArenaAPIClient();
@@ -873,7 +879,17 @@ function refreshCurrentRackBOM() {
 
       // Update status to SYNCED - no differences with Arena
       Logger.log('No changes detected - updating status to SYNCED');
-      updateRackSheetStatus(sheet, RACK_STATUS.SYNCED, arenaGuid);
+      var eventDetails = {
+        changesSummary: 'No changes detected',
+        details: 'Refreshed from Arena - BOM matches exactly'
+      };
+      updateRackSheetStatus(sheet, RACK_STATUS.SYNCED, arenaGuid, eventDetails);
+
+      // Log refresh event
+      addRackHistoryEvent(metadata.itemNumber, HISTORY_EVENT.REFRESH_NO_CHANGES, {
+        details: 'Refreshed BOM from Arena - no changes detected',
+        statusAfter: RACK_STATUS.SYNCED
+      });
 
       return {
         success: true,
@@ -892,7 +908,19 @@ function refreshCurrentRackBOM() {
     if (response !== ui.Button.YES) {
       // User declined to apply changes - mark as out of sync
       Logger.log('User declined to apply changes - updating status to ARENA_MODIFIED');
-      updateRackSheetStatus(sheet, RACK_STATUS.ARENA_MODIFIED, arenaGuid);
+      var changesCount = changes.modified.length + changes.added.length + changes.removed.length;
+      var eventDetails = {
+        changesSummary: changesCount + ' changes found, user declined',
+        details: 'User chose not to apply Arena BOM changes'
+      };
+      updateRackSheetStatus(sheet, RACK_STATUS.ARENA_MODIFIED, arenaGuid, eventDetails);
+
+      // Log refresh declined event
+      addRackHistoryEvent(metadata.itemNumber, HISTORY_EVENT.REFRESH_DECLINED, {
+        changesSummary: changesCount + ' changes pending',
+        details: 'Modified: ' + changes.modified.length + ', Added: ' + changes.added.length + ', Removed: ' + changes.removed.length,
+        statusAfter: RACK_STATUS.ARENA_MODIFIED
+      });
 
       return {
         success: false,
@@ -908,7 +936,20 @@ function refreshCurrentRackBOM() {
 
     // Update status to SYNCED - changes applied, now matches Arena
     Logger.log('Changes applied successfully - updating status to SYNCED');
-    updateRackSheetStatus(sheet, RACK_STATUS.SYNCED, arenaGuid);
+    var changesCount = changes.modified.length + changes.added.length + changes.removed.length;
+    var eventDetails = {
+      changesSummary: changesCount + ' changes applied',
+      details: 'Modified: ' + changes.modified.length + ', Added: ' + changes.added.length + ', Removed: ' + changes.removed.length
+    };
+    updateRackSheetStatus(sheet, RACK_STATUS.SYNCED, arenaGuid, eventDetails);
+
+    // Log refresh accepted event
+    addRackHistoryEvent(metadata.itemNumber, HISTORY_EVENT.REFRESH_ACCEPTED, {
+      changesSummary: changesCount + ' changes applied from Arena',
+      details: 'Modified: ' + changes.modified.length + ', Added: ' + changes.added.length + ', Removed: ' + changes.removed.length,
+      statusAfter: RACK_STATUS.SYNCED,
+      link: '=HYPERLINK("#BOM History", "View Details")'
+    });
 
     // Return success message
     var summary = (changes.modified.length + changes.added.length + changes.removed.length) + ' changes applied';
@@ -930,8 +971,21 @@ function refreshCurrentRackBOM() {
     try {
       var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
       if (isRackConfigSheet(sheet)) {
-        var arenaGuid = sheet.getRange(METADATA_ROW, META_ARENA_GUID_COL).getValue();
-        updateRackSheetStatus(sheet, RACK_STATUS.ERROR, arenaGuid || null);
+        var metadata = getRackConfigMetadata(sheet);
+        var arenaGuid = getRackArenaGuidFromHistory(metadata.itemNumber);
+
+        var eventDetails = {
+          changesSummary: 'Error during refresh',
+          details: 'Error: ' + error.message
+        };
+        updateRackSheetStatus(sheet, RACK_STATUS.ERROR, arenaGuid || null, eventDetails);
+
+        // Log error event
+        addRackHistoryEvent(metadata.itemNumber, HISTORY_EVENT.ERROR, {
+          changesSummary: 'Refresh failed',
+          details: error.message,
+          statusAfter: RACK_STATUS.ERROR
+        });
       }
     } catch (statusError) {
       Logger.log('Failed to update error status: ' + statusError.message);
@@ -1691,6 +1745,17 @@ function pullBOMForRack(sheet, itemNumber, itemGuid) {
 
     // Update status to SYNCED now that BOM has been pulled from Arena
     Logger.log('pullBOMForRack: Updating rack status to SYNCED with GUID: ' + itemGuid);
-    updateRackSheetStatus(sheet, RACK_STATUS.SYNCED, itemGuid);
+    var eventDetails = {
+      changesSummary: 'BOM pulled from Arena (' + rowData.length + ' items)',
+      details: 'Initial BOM pull from Arena item ' + itemNumber
+    };
+    updateRackSheetStatus(sheet, RACK_STATUS.SYNCED, itemGuid, eventDetails);
+
+    // Log BOM pull event
+    addRackHistoryEvent(itemNumber, HISTORY_EVENT.BOM_PULL, {
+      changesSummary: rowData.length + ' items pulled from Arena',
+      details: 'Initial BOM synchronization from Arena',
+      statusAfter: RACK_STATUS.SYNCED
+    });
   }
 }

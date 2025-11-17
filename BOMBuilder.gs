@@ -1285,7 +1285,18 @@ function createCustomRackItems(customRacks) {
 
       // Update rack status to SYNCED now that BOM has been synced to Arena
       Logger.log('Updating rack status to SYNCED after BOM sync: ' + rack.itemNumber);
-      updateRackSheetStatus(rack.sheet, RACK_STATUS.SYNCED, itemGuid);
+      var eventDetails = {
+        changesSummary: 'BOM synced to Arena (' + bomLines.length + ' items)',
+        details: 'POD push updated existing rack BOM in Arena'
+      };
+      updateRackSheetStatus(rack.sheet, RACK_STATUS.SYNCED, itemGuid, eventDetails);
+
+      // Log POD push event
+      addRackHistoryEvent(rack.itemNumber, HISTORY_EVENT.POD_PUSH, {
+        changesSummary: 'Rack BOM updated in Arena during POD push',
+        details: bomLines.length + ' BOM items synced to Arena',
+        statusAfter: RACK_STATUS.SYNCED
+      });
 
       createdItems.push({
         itemNumber: rack.itemNumber,
@@ -1405,7 +1416,18 @@ function createCustomRackItems(customRacks) {
 
       // Update rack status to SYNCED now that it has been created in Arena with BOM
       Logger.log('Updating rack status to SYNCED after creation: ' + rack.itemNumber + ' (GUID: ' + newItemGuid + ')');
-      updateRackSheetStatus(rack.sheet, RACK_STATUS.SYNCED, newItemGuid);
+      var eventDetails = {
+        changesSummary: 'Rack created in Arena with BOM',
+        details: 'POD push created new rack with ' + bomLines.length + ' BOM items'
+      };
+      updateRackSheetStatus(rack.sheet, RACK_STATUS.SYNCED, newItemGuid, eventDetails);
+
+      // Log POD push event (creation)
+      addRackHistoryEvent(rack.itemNumber, HISTORY_EVENT.POD_PUSH, {
+        changesSummary: 'Rack created in Arena during POD push',
+        details: 'New rack item created with ' + bomLines.length + ' BOM items',
+        statusAfter: RACK_STATUS.SYNCED
+      });
 
       createdItems.push({
         itemNumber: rack.itemNumber,

@@ -136,20 +136,35 @@ function createNewRackConfiguration() {
   newSheet.getRange(METADATA_ROW, META_LABEL_COL).setValue('PARENT_ITEM');
   newSheet.getRange(METADATA_ROW, META_ITEM_NUM_COL).setValue(rackItemNumber);
   newSheet.getRange(METADATA_ROW, META_ITEM_NAME_COL).setValue(rackItemName);
-  newSheet.getRange(METADATA_ROW, META_ITEM_DESC_COL).setValue(rackItemDescription);
+  // NOTE: D1 will be set to History link below
 
-  // Initialize status metadata (will be updated after BOM pull if from Arena)
-  // Status starts as PLACEHOLDER, will be updated to SYNCED if BOM pulled from Arena
-  newSheet.getRange(METADATA_ROW, META_STATUS_COL).setValue(RACK_STATUS.PLACEHOLDER);
-  newSheet.getRange(METADATA_ROW, META_ARENA_GUID_COL).setValue(''); // Will be set if from Arena
-  newSheet.getRange(METADATA_ROW, META_LAST_SYNC_COL).setValue(new Date());
-  newSheet.getRange(METADATA_ROW, META_CHECKSUM_COL).setValue(''); // Will be calculated after BOM data added
-
-  // Format metadata row (extended to include status columns)
-  var metaRange = newSheet.getRange(METADATA_ROW, 1, 1, 9); // Extended to column I
+  // Format metadata row (basic info only, columns A-C)
+  var metaRange = newSheet.getRange(METADATA_ROW, 1, 1, 3);
   metaRange.setBackground('#e8f0fe');
   metaRange.setFontWeight('bold');
   metaRange.setFontColor('#1967d2');
+
+  // Step 5b: Initialize rack in History tab
+  // Status starts as PLACEHOLDER, will be updated to SYNCED if BOM pulled from Arena
+  createRackHistorySummaryRow(rackItemNumber, rackItemName, {
+    status: RACK_STATUS.PLACEHOLDER,
+    arenaGuid: '',
+    created: new Date(),
+    lastRefresh: '',
+    lastSync: '',
+    lastPush: '',
+    checksum: ''
+  });
+
+  // Log rack creation event
+  addRackHistoryEvent(rackItemNumber, HISTORY_EVENT.RACK_CREATED, {
+    changesSummary: 'New rack configuration created',
+    details: 'Rack configuration sheet created: ' + rackItemName,
+    statusAfter: RACK_STATUS.PLACEHOLDER
+  });
+
+  // Step 5c: Add History link in D1
+  createHistoryLinkInRackSheet(newSheet);
 
   // Step 6: Set up header row (Row 2)
   var itemColumns = getItemColumns();

@@ -42,13 +42,14 @@ var STATUS_TEXT_INDICATORS = {
 };
 
 /**
- * Metadata column constants for status tracking
- * Extends existing RackConfigManager.gs metadata structure
+ * DEPRECATED: Metadata column constants (no longer used in Row 1)
+ * These columns have been moved to the centralized Rack History tab
+ * Keeping constants for backward compatibility and migration
  */
-var META_STATUS_COL = 6;        // Column F - Sync status
-var META_ARENA_GUID_COL = 7;    // Column G - Arena item GUID
-var META_LAST_SYNC_COL = 8;     // Column H - Last sync timestamp
-var META_CHECKSUM_COL = 9;      // Column I - BOM checksum for change detection
+var META_STATUS_COL = 6;        // Column F - Sync status (DEPRECATED - use History tab)
+var META_ARENA_GUID_COL = 7;    // Column G - Arena item GUID (DEPRECATED - use History tab)
+var META_LAST_SYNC_COL = 8;     // Column H - Last sync timestamp (DEPRECATED - use History tab)
+var META_CHECKSUM_COL = 9;      // Column I - BOM checksum (DEPRECATED - use History tab)
 
 // ============================================================================
 // CORE STATUS MANAGEMENT FUNCTIONS
@@ -56,11 +57,13 @@ var META_CHECKSUM_COL = 9;      // Column I - BOM checksum for change detection
 
 /**
  * Updates the sync status of a rack configuration sheet
+ * REFACTORED: Now uses History tab instead of Row 1 metadata
  * @param {Sheet} sheet - Rack configuration sheet
  * @param {string} status - Status value from RACK_STATUS
  * @param {string} arenaGuid - Arena item GUID (optional, null for PLACEHOLDER)
+ * @param {Object} eventDetails - Optional details for history event logging
  */
-function updateRackSheetStatus(sheet, status, arenaGuid) {
+function updateRackSheetStatus(sheet, status, arenaGuid, eventDetails) {
   if (!sheet) {
     Logger.log('updateRackSheetStatus: No sheet provided');
     return;
@@ -73,21 +76,39 @@ function updateRackSheetStatus(sheet, status, arenaGuid) {
   }
 
   try {
-    // Update status
-    sheet.getRange(METADATA_ROW, META_STATUS_COL).setValue(status);
+    var metadata = getRackConfigMetadata(sheet);
+    var itemNumber = metadata.itemNumber;
+    var rackName = metadata.itemName;
 
-    // Update Arena GUID if provided
-    if (arenaGuid) {
-      sheet.getRange(METADATA_ROW, META_ARENA_GUID_COL).setValue(arenaGuid);
+    // Get previous status for history logging
+    var previousStatus = getRackStatusFromHistory(itemNumber);
+
+    // Prepare metadata update
+    var metadataUpdate = {
+      status: status,
+      lastSync: new Date()
+    };
+
+    if (arenaGuid !== undefined) {
+      metadataUpdate.arenaGuid = arenaGuid;
     }
-
-    // Update timestamp
-    sheet.getRange(METADATA_ROW, META_LAST_SYNC_COL).setValue(new Date());
 
     // Calculate and store checksum if status is SYNCED
     if (status === RACK_STATUS.SYNCED) {
       var checksum = calculateBOMChecksum(sheet);
-      sheet.getRange(METADATA_ROW, META_CHECKSUM_COL).setValue(checksum);
+      metadataUpdate.checksum = checksum;
+    }
+
+    // Update History tab
+    updateRackHistorySummary(itemNumber, rackName, metadataUpdate);
+
+    // Log status change event to history
+    if (previousStatus !== status) {
+      var historyDetails = eventDetails || {};
+      historyDetails.statusBefore = previousStatus || '';
+      historyDetails.statusAfter = status;
+
+      addRackHistoryEvent(itemNumber, HISTORY_EVENT.STATUS_CHANGE, historyDetails);
     }
 
     // Update tab name with status indicator
@@ -102,6 +123,7 @@ function updateRackSheetStatus(sheet, status, arenaGuid) {
 
 /**
  * Gets the current sync status of a rack configuration sheet
+ * REFACTORED: Now reads from History tab instead of Row 1
  * @param {Sheet} sheet - Rack configuration sheet
  * @return {string|null} Status value or null if not found
  */
@@ -109,8 +131,10 @@ function getRackSheetStatus(sheet) {
   if (!sheet) return null;
 
   try {
-    var status = sheet.getRange(METADATA_ROW, META_STATUS_COL).getValue();
-    return status || null;
+    var metadata = getRackConfigMetadata(sheet);
+    if (!metadata) return null;
+
+    return getRackStatusFromHistory(metadata.itemNumber);
   } catch (error) {
     Logger.log('Error reading rack status: ' + error.message);
     return null;
@@ -206,13 +230,16 @@ function calculateBOMChecksum(sheet) {
 
 /**
  * Detects if the rack sheet has been modified locally since last sync
- * Compares current BOM checksum with stored checksum
+ * REFACTORED: Compares current BOM checksum with stored checksum from History tab
  * @param {Sheet} sheet - Rack configuration sheet
  * @return {boolean} True if modified locally
  */
 function detectLocalChanges(sheet) {
+  var metadata = getRackConfigMetadata(sheet);
+  if (!metadata) return false;
+
   var currentChecksum = calculateBOMChecksum(sheet);
-  var storedChecksum = sheet.getRange(METADATA_ROW, META_CHECKSUM_COL).getValue();
+  var storedChecksum = getRackChecksumFromHistory(metadata.itemNumber);
 
   if (!storedChecksum) {
     return false; // No baseline to compare against
@@ -390,7 +417,8 @@ function checkAllRackStatuses() {
         return; // Skip placeholders
       }
 
-      var arenaGuid = rack.sheet.getRange(METADATA_ROW, META_ARENA_GUID_COL).getValue();
+      // REFACTORED: Read GUID from History tab
+      var arenaGuid = getRackArenaGuidFromHistory(rack.itemNumber);
       if (arenaGuid) {
         guidsToCheck.push(arenaGuid);
         rackByGuid[arenaGuid] = rack;
@@ -521,6 +549,7 @@ function getCurrentRackBOMData(sheet) {
 
 /**
  * Manually mark a rack as synced (user override)
+ * REFACTORED: Reads GUID from History tab and logs manual sync event
  * Useful if user knows status is incorrect
  */
 function markCurrentRackAsSynced() {
@@ -531,12 +560,32 @@ function markCurrentRackAsSynced() {
     return;
   }
 
-  var arenaGuid = sheet.getRange(METADATA_ROW, META_ARENA_GUID_COL).getValue();
+  var metadata = getRackConfigMetadata(sheet);
+  if (!metadata) {
+    SpreadsheetApp.getUi().alert('Error', 'Could not read rack metadata.', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  // REFACTORED: Read GUID from History tab
+  var arenaGuid = getRackArenaGuidFromHistory(metadata.itemNumber);
   if (!arenaGuid) {
     SpreadsheetApp.getUi().alert('Error', 'This rack has no Arena GUID. Cannot mark as synced.', SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
 
-  updateRackSheetStatus(sheet, RACK_STATUS.SYNCED, arenaGuid);
+  // Update status with event details
+  var eventDetails = {
+    changesSummary: 'User manually marked as synced',
+    details: 'User override - marked as synced via menu action'
+  };
+
+  updateRackSheetStatus(sheet, RACK_STATUS.SYNCED, arenaGuid, eventDetails);
+
+  // Log manual sync event
+  addRackHistoryEvent(metadata.itemNumber, HISTORY_EVENT.MANUAL_SYNC, {
+    details: 'User manually marked rack as synced',
+    statusAfter: RACK_STATUS.SYNCED
+  });
+
   SpreadsheetApp.getUi().alert('Success', 'Rack marked as synced with Arena.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
