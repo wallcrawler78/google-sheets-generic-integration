@@ -2215,13 +2215,14 @@ function preparePODWizardDataForModal() {
     });
   });
 
-  Logger.log('Found ' + allRackNumbers.length + ' unique racks in overview');
+  Logger.log('Found ' + allRackNumbers.length + ' unique racks in overview: ' + allRackNumbers.join(', '));
 
   // Build rack config map (scan sheets ONCE)
   var rackConfigMap = {};
   sheets.forEach(function(sheet) {
     var metadata = getRackConfigMetadata(sheet);
     if (metadata) {
+      Logger.log('Found rack config sheet: ' + metadata.itemNumber + ' - ' + metadata.itemName);
       rackConfigMap[metadata.itemNumber] = {
         sheet: sheet,
         metadata: metadata,
@@ -2230,7 +2231,8 @@ function preparePODWizardDataForModal() {
     }
   });
 
-  Logger.log('Built rack config map with ' + Object.keys(rackConfigMap).length + ' racks');
+  var rackConfigNumbers = Object.keys(rackConfigMap);
+  Logger.log('Built rack config map with ' + rackConfigNumbers.length + ' racks: ' + rackConfigNumbers.join(', '));
 
   // Separate placeholder vs existing racks
   var placeholderRacks = [];
@@ -2246,28 +2248,41 @@ function preparePODWizardDataForModal() {
 
     // Check if exists in Arena
     var existsInArena = false;
+    var arenaItem = null;
+
+    Logger.log('Checking if rack ' + itemNumber + ' exists in Arena...');
+
     try {
-      var arenaItem = client.getItemByNumber(itemNumber);
+      arenaItem = client.getItemByNumber(itemNumber);
+
+      Logger.log('Arena API response for ' + itemNumber + ': ' + JSON.stringify(arenaItem));
 
       if (arenaItem && (arenaItem.guid || arenaItem.Guid)) {
         // Exists in Arena (has valid GUID)
         existsInArena = true;
-        Logger.log('✓ Rack ' + itemNumber + ' exists in Arena (GUID: ' + (arenaItem.guid || arenaItem.Guid) + ')');
+        var guid = arenaItem.guid || arenaItem.Guid;
+        var name = arenaItem.name || arenaItem.Name || rackConfig.metadata.itemName;
+        Logger.log('✓ Rack ' + itemNumber + ' EXISTS in Arena (GUID: ' + guid + ', Name: ' + name + ')');
+      } else {
+        Logger.log('⚠ Arena returned response but no GUID found for ' + itemNumber);
       }
     } catch (error) {
       // Error fetching = doesn't exist in Arena
-      Logger.log('✗ Rack ' + itemNumber + ' not found in Arena: ' + error.message);
+      Logger.log('✗ Rack ' + itemNumber + ' NOT FOUND in Arena: ' + error.message);
     }
 
     if (existsInArena) {
       existingRacks.push({
         itemNumber: itemNumber,
-        name: rackConfig.metadata.itemName,
-        childCount: rackConfig.childCount
+        name: arenaItem.name || arenaItem.Name || rackConfig.metadata.itemName,
+        description: arenaItem.description || arenaItem.Description || rackConfig.metadata.description || '',
+        childCount: rackConfig.childCount,
+        guid: arenaItem.guid || arenaItem.Guid
       });
+      Logger.log('→ Added ' + itemNumber + ' to EXISTING racks list');
     } else {
       // Doesn't exist in Arena - placeholder
-      Logger.log('→ Adding ' + itemNumber + ' to placeholder list');
+      Logger.log('→ Adding ' + itemNumber + ' to PLACEHOLDER list');
       placeholderRacks.push({
         itemNumber: itemNumber,
         name: rackConfig.metadata.itemName || '',

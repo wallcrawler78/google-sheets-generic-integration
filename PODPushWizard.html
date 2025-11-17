@@ -239,6 +239,35 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
 
+    /* Existing rack styling */
+    .existing-rack-row {
+      background: #e6f4ea !important;
+      opacity: 0.9;
+    }
+
+    .existing-rack-row td {
+      color: #137333 !important;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-badge.existing {
+      background: #137333;
+      color: white;
+    }
+
+    .status-badge.new {
+      background: #ea8600;
+      color: white;
+    }
+
     .bom-visualization {
       background: white;
       border-radius: 8px;
@@ -475,21 +504,22 @@
       <div id="loadingText">Loading...</div>
     </div>
 
-    <!-- Stage 1: Placeholder Racks -->
+    <!-- Stage 1: Racks -->
     <div class="stage-panel active" id="stage1">
-      <div class="section-title">Configure Placeholder Racks</div>
+      <div class="section-title">Configure Racks</div>
       <div class="section-description">
-        Fill in details for each rack. Click "Select Category" to choose from favorites or search all categories.
+        Fill in details for new racks. Existing racks (in green) are already in Arena and will be skipped.
       </div>
 
       <div class="data-table">
         <table>
           <thead>
             <tr>
-              <th style="width: 15%;">Part Number</th>
+              <th style="width: 12%;">Status</th>
+              <th style="width: 13%;">Part Number</th>
               <th style="width: 20%;">Name</th>
-              <th style="width: 30%;">Description</th>
-              <th style="width: 25%;">Category</th>
+              <th style="width: 25%;">Description</th>
+              <th style="width: 20%;">Category</th>
               <th style="width: 10%;">Items</th>
             </tr>
           </thead>
@@ -619,9 +649,27 @@
       const tbody = document.getElementById('racksTableBody');
       tbody.innerHTML = '';
 
+      // First render existing racks (green, read-only)
+      if (wizardData.existingRacks && wizardData.existingRacks.length > 0) {
+        wizardData.existingRacks.forEach((rack) => {
+          const row = document.createElement('tr');
+          row.className = 'existing-rack-row';
+          row.innerHTML = `
+            <td><span class="status-badge existing">✓ Exists</span></td>
+            <td><strong>${rack.itemNumber}</strong></td>
+            <td>${rack.name || ''}</td>
+            <td colspan="2" style="font-style: italic; color: #137333;">Already exists in Arena</td>
+            <td style="text-align: center;">${rack.childCount || 0}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+
+      // Then render placeholder racks (editable)
       wizardData.racks.forEach((rack, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
+          <td><span class="status-badge new">New</span></td>
           <td><strong>${rack.itemNumber}</strong></td>
           <td>
             <input type="text"
