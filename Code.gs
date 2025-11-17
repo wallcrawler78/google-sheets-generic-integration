@@ -894,8 +894,8 @@ function refreshCurrentRackBOM() {
     var currentData = getCurrentRackBOMData(sheet);
     Logger.log('Current sheet has ' + currentData.length + ' rows');
 
-    // Compare and detect changes
-    var changes = compareBOMs(currentData, arenaBOM);
+    // Compare and detect changes (pass arenaClient to fetch full item details)
+    var changes = compareBOMs(currentData, arenaBOM, arenaClient);
 
     Logger.log('Changes detected:');
     Logger.log('- Modified: ' + changes.modified.length);

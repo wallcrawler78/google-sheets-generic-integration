@@ -42,38 +42,98 @@ function getCurrentRackBOMData(sheet) {
 
 /**
  * Compares current BOM with Arena BOM and detects changes
+ * FIXED: Now fetches full item details from Arena to prevent data loss
  * @param {Array<Object>} currentBOM - Current sheet data
- * @param {Array<Object>} arenaBOM - Fresh BOM from Arena
+ * @param {Array<Object>} arenaBOM - Fresh BOM from Arena (lightweight)
+ * @param {ArenaAPIClient} arenaClient - Arena API client for fetching full item details
  * @return {Object} Changes categorized as modified, added, removed
  */
-function compareBOMs(currentBOM, arenaBOM) {
+function compareBOMs(currentBOM, arenaBOM, arenaClient) {
   var changes = {
     modified: [],
     added: [],
     removed: []
   };
 
-  // Build lookup maps
+  Logger.log('compareBOMs: Starting comparison with ' + currentBOM.length + ' current items and ' + arenaBOM.length + ' Arena items');
+
+  // Build lookup map for current BOM
   var currentMap = {};
   currentBOM.forEach(function(item) {
     currentMap[item.itemNumber] = item;
   });
 
+  // Build Arena map by fetching FULL item details for each BOM line
   var arenaMap = {};
   arenaBOM.forEach(function(line) {
-    var bomItem = line.item || line.Item || {};
-    var itemNumber = bomItem.number || bomItem.Number || '';
-    if (itemNumber) {
+    try {
+      var bomItem = line.item || line.Item || {};
+      var itemNumber = bomItem.number || bomItem.Number || '';
+      var itemGuid = bomItem.guid || bomItem.Guid || '';
+
+      if (!itemNumber) {
+        Logger.log('compareBOMs: Skipping BOM line - no item number');
+        return;
+      }
+
+      Logger.log('compareBOMs: Fetching full details for item ' + itemNumber + ' (GUID: ' + itemGuid + ')');
+
+      // Fetch FULL item details from Arena
+      var fullItem = null;
+      if (itemGuid) {
+        try {
+          fullItem = arenaClient.makeRequest('/items/' + itemGuid, { method: 'GET' });
+        } catch (error) {
+          Logger.log('compareBOMs: Error fetching item by GUID: ' + error.message);
+        }
+      }
+
+      // Fallback to search by number if GUID fetch failed
+      if (!fullItem) {
+        Logger.log('compareBOMs: Trying search by number for ' + itemNumber);
+        try {
+          fullItem = arenaClient.getItemByNumber(itemNumber);
+        } catch (error) {
+          Logger.log('compareBOMs: Error fetching item by number: ' + error.message);
+          fullItem = bomItem; // Fallback to lightweight BOM item
+        }
+      }
+
+      // Extract fields from full item
+      var name = fullItem.name || fullItem.Name || '';
+      var description = fullItem.description || fullItem.Description || '';
+      var categoryName = '';
+      if (fullItem.category || fullItem.Category) {
+        var cat = fullItem.category || fullItem.Category;
+        categoryName = cat.name || cat.Name || '';
+      }
+      var lifecycleName = '';
+      if (fullItem.lifecyclePhase || fullItem.LifecyclePhase) {
+        var lc = fullItem.lifecyclePhase || fullItem.LifecyclePhase;
+        lifecycleName = lc.name || lc.Name || '';
+      }
+
+      // Quantity comes from BOM line, not item
+      var quantity = line.quantity || line.Quantity || 1;
+
       arenaMap[itemNumber] = {
         itemNumber: itemNumber,
-        name: bomItem.name || bomItem.Name || '',
-        description: bomItem.description || bomItem.Description || '',
-        category: (bomItem.category || bomItem.Category || {}).name || (bomItem.category || bomItem.Category || {}).Name || '',
-        lifecycle: (bomItem.lifecyclePhase || bomItem.LifecyclePhase || {}).name || (bomItem.lifecyclePhase || bomItem.LifecyclePhase || {}).Name || '',
-        quantity: line.quantity || line.Quantity || 1
+        name: name,
+        description: description,
+        category: categoryName,
+        lifecycle: lifecycleName,
+        quantity: quantity,
+        _hasFullData: !!fullItem  // Flag to indicate we got full details
       };
+
+      Logger.log('compareBOMs: Processed ' + itemNumber + ' - name: "' + name + '", desc: "' + description.substring(0, 50) + '...", cat: "' + categoryName + '", lc: "' + lifecycleName + '"');
+
+    } catch (error) {
+      Logger.log('compareBOMs: Error processing BOM line: ' + error.message);
     }
   });
+
+  Logger.log('compareBOMs: Built Arena map with ' + Object.keys(arenaMap).length + ' items');
 
   // Find modified and added items
   for (var arenaItemNumber in arenaMap) {
@@ -82,58 +142,89 @@ function compareBOMs(currentBOM, arenaBOM) {
 
     if (!currentItem) {
       // Item in Arena but not in sheet = ADDED
+      Logger.log('compareBOMs: Item ' + arenaItemNumber + ' is ADDED');
       changes.added.push(arenaItem);
     } else {
       // Item exists in both - check for modifications
       var itemChanges = [];
 
-      if (currentItem.name !== arenaItem.name) {
-        itemChanges.push({
-          field: 'Name',
-          oldValue: currentItem.name,
-          newValue: arenaItem.name
-        });
-      }
+      // Only compare fields if we have full Arena data
+      // This prevents false "changes" when Arena returns minimal data
+      if (arenaItem._hasFullData) {
 
-      if (currentItem.description !== arenaItem.description) {
-        itemChanges.push({
-          field: 'Description',
-          oldValue: currentItem.description,
-          newValue: arenaItem.description
-        });
-      }
+        // Compare name (always present)
+        if (arenaItem.name && currentItem.name !== arenaItem.name) {
+          itemChanges.push({
+            field: 'Name',
+            oldValue: currentItem.name,
+            newValue: arenaItem.name
+          });
+        }
 
-      if (currentItem.category !== arenaItem.category) {
-        itemChanges.push({
-          field: 'Category',
-          oldValue: currentItem.category,
-          newValue: arenaItem.category
-        });
-      }
+        // Compare description (only if Arena has it)
+        if (arenaItem.description && currentItem.description !== arenaItem.description) {
+          itemChanges.push({
+            field: 'Description',
+            oldValue: currentItem.description,
+            newValue: arenaItem.description
+          });
+        }
 
-      if (currentItem.lifecycle !== arenaItem.lifecycle) {
-        itemChanges.push({
-          field: 'Lifecycle',
-          oldValue: currentItem.lifecycle,
-          newValue: arenaItem.lifecycle
-        });
-      }
+        // Compare category (only if Arena has it)
+        if (arenaItem.category && currentItem.category !== arenaItem.category) {
+          itemChanges.push({
+            field: 'Category',
+            oldValue: currentItem.category,
+            newValue: arenaItem.category
+          });
+        }
 
-      if (currentItem.quantity !== arenaItem.quantity) {
-        itemChanges.push({
-          field: 'Quantity',
-          oldValue: currentItem.quantity,
-          newValue: arenaItem.quantity
-        });
-      }
+        // Compare lifecycle (only if Arena has it)
+        if (arenaItem.lifecycle && currentItem.lifecycle !== arenaItem.lifecycle) {
+          itemChanges.push({
+            field: 'Lifecycle',
+            oldValue: currentItem.lifecycle,
+            newValue: arenaItem.lifecycle
+          });
+        }
 
-      if (itemChanges.length > 0) {
-        changes.modified.push({
-          itemNumber: arenaItemNumber,
-          rowNumber: currentItem.rowNumber,
-          changes: itemChanges,
-          newData: arenaItem
-        });
+        // Always compare quantity (comes from BOM, not item)
+        if (currentItem.quantity !== arenaItem.quantity) {
+          itemChanges.push({
+            field: 'Quantity',
+            oldValue: currentItem.quantity,
+            newValue: arenaItem.quantity
+          });
+        }
+
+        if (itemChanges.length > 0) {
+          Logger.log('compareBOMs: Item ' + arenaItemNumber + ' has ' + itemChanges.length + ' change(s)');
+          changes.modified.push({
+            itemNumber: arenaItemNumber,
+            rowNumber: currentItem.rowNumber,
+            changes: itemChanges,
+            newData: arenaItem
+          });
+        }
+      } else {
+        Logger.log('compareBOMs: Skipping detailed comparison for ' + arenaItemNumber + ' - no full data from Arena');
+
+        // Only compare quantity since that's from the BOM itself
+        if (currentItem.quantity !== arenaItem.quantity) {
+          Logger.log('compareBOMs: Item ' + arenaItemNumber + ' has quantity change');
+          itemChanges.push({
+            field: 'Quantity',
+            oldValue: currentItem.quantity,
+            newValue: arenaItem.quantity
+          });
+
+          changes.modified.push({
+            itemNumber: arenaItemNumber,
+            rowNumber: currentItem.rowNumber,
+            changes: itemChanges,
+            newData: arenaItem
+          });
+        }
       }
     }
   }
@@ -141,9 +232,12 @@ function compareBOMs(currentBOM, arenaBOM) {
   // Find removed items (in current but not in Arena)
   for (var currentItemNumber in currentMap) {
     if (!arenaMap[currentItemNumber]) {
+      Logger.log('compareBOMs: Item ' + currentItemNumber + ' is REMOVED');
       changes.removed.push(currentMap[currentItemNumber]);
     }
   }
+
+  Logger.log('compareBOMs: Comparison complete - Modified: ' + changes.modified.length + ', Added: ' + changes.added.length + ', Removed: ' + changes.removed.length);
 
   return changes;
 }

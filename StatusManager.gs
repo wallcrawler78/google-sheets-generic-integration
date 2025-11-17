@@ -462,8 +462,8 @@ function checkAllRackStatuses() {
         // Get current sheet BOM
         var sheetBOM = getCurrentRackBOMData(rack.sheet);
 
-        // Compare
-        var changes = compareBOMs(sheetBOM, arenaBOMLines);
+        // Compare (pass client to fetch full item details)
+        var changes = compareBOMs(sheetBOM, arenaBOMLines, client);
         var hasChanges = changes.modified.length > 0 || changes.added.length > 0 || changes.removed.length > 0;
 
         if (hasChanges) {
