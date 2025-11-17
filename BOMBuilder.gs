@@ -2158,6 +2158,349 @@ function validatePreconditions(overviewSheet, customRacks) {
 }
 
 /**
+ * NEW: Wizard-based POD push - scans sheets once and presents comprehensive UI
+ * This is the new entry point that replaces the old dialog-by-dialog approach
+ */
+function pushPODStructureToArenaNew() {
+  Logger.log('==========================================');
+  Logger.log('POD PUSH WIZARD - START');
+  Logger.log('==========================================');
+
+  try {
+    // Prepare all data with ONE sheet scan
+    var wizardData = preparePODWizardData();
+
+    if (!wizardData.success) {
+      SpreadsheetApp.getUi().alert('Error', wizardData.message, SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+
+    // Show the wizard HTML dialog
+    showPODPushWizard(wizardData);
+
+  } catch (error) {
+    Logger.log('Error in POD Push Wizard: ' + error.message);
+    SpreadsheetApp.getUi().alert('Error', 'Failed to start POD push wizard: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * Prepares all data for the POD push wizard by scanning sheets ONCE
+ * Returns comprehensive data structure for the UI
+ */
+function preparePODWizardData() {
+  Logger.log('Preparing POD wizard data...');
+
+  var client = new ArenaAPIClient();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Find overview sheet
+  var overviewSheet = null;
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getName().toLowerCase().indexOf('overview') !== -1) {
+      overviewSheet = sheets[i];
+      break;
+    }
+  }
+
+  if (!overviewSheet) {
+    return { success: false, message: 'Overview sheet not found.' };
+  }
+
+  // Scan overview for rack/row structure
+  var overviewData = scanOverviewByRow(overviewSheet);
+
+  if (overviewData.length === 0) {
+    return { success: false, message: 'No racks found in overview sheet.' };
+  }
+
+  // Get all unique rack numbers
+  var allRackNumbers = [];
+  overviewData.forEach(function(row) {
+    row.positions.forEach(function(pos) {
+      if (allRackNumbers.indexOf(pos.itemNumber) === -1) {
+        allRackNumbers.push(pos.itemNumber);
+      }
+    });
+  });
+
+  Logger.log('Found ' + allRackNumbers.length + ' unique racks in overview');
+
+  // Build rack config map (scan sheets ONCE)
+  var rackConfigMap = {};
+  sheets.forEach(function(sheet) {
+    var metadata = getRackConfigMetadata(sheet);
+    if (metadata) {
+      rackConfigMap[metadata.itemNumber] = {
+        sheet: sheet,
+        metadata: metadata,
+        childCount: Math.max(0, sheet.getLastRow() - 2)
+      };
+    }
+  });
+
+  Logger.log('Built rack config map with ' + Object.keys(rackConfigMap).length + ' racks');
+
+  // Separate placeholder vs existing racks
+  var placeholderRacks = [];
+  var existingRacks = [];
+
+  allRackNumbers.forEach(function(itemNumber) {
+    var rackConfig = rackConfigMap[itemNumber];
+
+    if (!rackConfig) {
+      Logger.log('⚠ No rack config found for: ' + itemNumber);
+      return;
+    }
+
+    // Check if exists in Arena
+    try {
+      var arenaItem = client.getItemByNumber(itemNumber);
+
+      if (arenaItem) {
+        // Exists in Arena
+        existingRacks.push({
+          itemNumber: itemNumber,
+          name: rackConfig.metadata.itemName,
+          childCount: rackConfig.childCount
+        });
+      }
+    } catch (error) {
+      // Doesn't exist in Arena - placeholder
+      placeholderRacks.push({
+        itemNumber: itemNumber,
+        name: rackConfig.metadata.itemName || '',
+        description: rackConfig.metadata.description || '',
+        category: null,  // User will select
+        childCount: rackConfig.childCount,
+        sheet: rackConfig.sheet
+      });
+    }
+  });
+
+  Logger.log('Placeholder racks: ' + placeholderRacks.length);
+  Logger.log('Existing racks: ' + existingRacks.length);
+
+  // Prepare row data
+  var rowsData = overviewData.map(function(row) {
+    return {
+      rowNumber: row.rowNumber,
+      name: 'ROW-' + row.rowNumber,
+      category: null,  // User will select
+      positions: row.positions.map(function(pos) {
+        return {
+          position: pos.position,
+          itemNumber: pos.itemNumber
+        };
+      })
+    };
+  });
+
+  return {
+    success: true,
+    racks: placeholderRacks,
+    existingRacks: existingRacks,
+    rows: rowsData,
+    pod: {
+      name: '',
+      category: null
+    }
+  };
+}
+
+/**
+ * Shows the POD Push Wizard HTML dialog
+ */
+function showPODPushWizard(wizardData) {
+  var html = HtmlService.createHtmlOutputFromFile('PODPushWizard')
+    .setWidth(1200)
+    .setHeight(800);
+
+  // Pass data to wizard
+  var scriptlet = '<script>initializeWizard(' + JSON.stringify(wizardData) + ');</script>';
+  var content = html.getContent() + scriptlet;
+  html.setContent(content);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'POD Structure Push Wizard');
+}
+
+/**
+ * Executes the batch POD push with data from the wizard
+ * This is called by the wizard after user fills in all data
+ */
+function executePODPush(wizardData) {
+  Logger.log('==========================================');
+  Logger.log('EXECUTING BATCH POD PUSH');
+  Logger.log('==========================================');
+
+  var client = new ArenaAPIClient();
+  var createdRacks = [];
+  var createdRows = [];
+
+  try {
+    // STEP 1: Create all placeholder racks (batch)
+    Logger.log('Step 1: Creating ' + wizardData.racks.length + ' placeholder racks...');
+
+    for (var i = 0; i < wizardData.racks.length; i++) {
+      var rack = wizardData.racks[i];
+
+      Logger.log('Creating rack: ' + rack.itemNumber);
+
+      // Create item in Arena (without number initially)
+      var newItem = client.createItem({
+        name: rack.name,
+        category: {
+          guid: rack.category.guid
+        },
+        description: rack.description
+      });
+
+      var newItemGuid = newItem.guid || newItem.Guid;
+
+      // Update with desired rack number
+      client.updateItem(newItemGuid, { number: rack.itemNumber });
+
+      // Get rack children and sync BOM
+      var children = getRackConfigChildren(rack.sheet);
+      var bomLines = [];
+
+      for (var j = 0; j < children.length; j++) {
+        var child = children[j];
+        var childItem = client.getItemByNumber(child.itemNumber);
+        var childGuid = childItem.guid || childItem.Guid;
+
+        bomLines.push({
+          itemNumber: child.itemNumber,
+          itemGuid: childGuid,
+          quantity: child.quantity || 1,
+          level: 0
+        });
+      }
+
+      syncBOMToArena(client, newItemGuid, bomLines);
+
+      // Update rack status
+      updateRackSheetStatus(rack.sheet, RACK_STATUS.SYNCED, newItemGuid, {
+        changesSummary: 'Rack created in Arena via POD push',
+        details: 'Created with ' + bomLines.length + ' BOM items'
+      });
+
+      createdRacks.push({
+        itemNumber: rack.itemNumber,
+        guid: newItemGuid,
+        name: rack.name
+      });
+
+      Logger.log('✓ Created rack: ' + rack.itemNumber);
+    }
+
+    // STEP 2: Create all rows (batch)
+    Logger.log('Step 2: Creating ' + wizardData.rows.length + ' rows...');
+
+    for (var r = 0; r < wizardData.rows.length; r++) {
+      var row = wizardData.rows[r];
+
+      Logger.log('Creating row: ' + row.name);
+
+      // Create row item
+      var rowItem = client.createItem({
+        name: row.name,
+        category: {
+          guid: row.category.guid
+        },
+        description: 'Row ' + row.rowNumber + ' containing ' + row.positions.length + ' racks'
+      });
+
+      var rowItemGuid = rowItem.guid || rowItem.Guid;
+      var rowItemNumber = rowItem.number || rowItem.Number;
+
+      // Create BOM for row (all racks at positions)
+      var rowBomLines = [];
+      for (var p = 0; p < row.positions.length; p++) {
+        var pos = row.positions[p];
+        var rackItem = client.getItemByNumber(pos.itemNumber);
+        var rackGuid = rackItem.guid || rackItem.Guid;
+
+        rowBomLines.push({
+          itemNumber: pos.itemNumber,
+          itemGuid: rackGuid,
+          quantity: 1,
+          level: 0,
+          position: pos.position
+        });
+      }
+
+      syncBOMToArena(client, rowItemGuid, rowBomLines);
+
+      createdRows.push({
+        itemNumber: rowItemNumber,
+        guid: rowItemGuid,
+        name: row.name
+      });
+
+      Logger.log('✓ Created row: ' + rowItemNumber);
+    }
+
+    // STEP 3: Create POD
+    Logger.log('Step 3: Creating POD...');
+
+    var podItem = client.createItem({
+      name: wizardData.pod.name,
+      category: {
+        guid: wizardData.pod.category.guid
+      },
+      description: 'Point of Delivery containing ' + createdRows.length + ' rows'
+    });
+
+    var podItemGuid = podItem.guid || podItem.Guid;
+    var podItemNumber = podItem.number || podItem.Number;
+
+    // Create BOM for POD (all rows)
+    var podBomLines = createdRows.map(function(row) {
+      return {
+        itemNumber: row.itemNumber,
+        itemGuid: row.guid,
+        quantity: 1,
+        level: 0
+      };
+    });
+
+    syncBOMToArena(client, podItemGuid, podBomLines);
+
+    Logger.log('✓ Created POD: ' + podItemNumber);
+
+    return {
+      success: true,
+      racksCreated: createdRacks.length,
+      rowsCreated: createdRows.length,
+      podItemNumber: podItemNumber,
+      podGuid: podItemGuid
+    };
+
+  } catch (error) {
+    Logger.log('ERROR in batch POD push: ' + error.message);
+    throw error;
+  }
+}
+
+/**
+ * Shows category selector from wizard context
+ * Called by PODPushWizard.html
+ */
+function showCategorySelector() {
+  var html = HtmlService.createHtmlOutputFromFile('CategorySelector')
+    .setWidth(600)
+    .setHeight(700);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Select Category');
+
+  // Note: Category selection is handled via returnCategorySelection()
+  // which will call back to the wizard
+}
+
+/**
+ * OLD: Original dialog-by-dialog POD push (DEPRECATED - use pushPODStructureToArenaNew instead)
  * Main function to push POD structure to Arena
  * Creates POD -> Rows -> Racks hierarchy in Arena
  */
