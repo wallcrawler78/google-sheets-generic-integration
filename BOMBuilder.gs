@@ -2255,19 +2255,29 @@ function preparePODWizardData() {
     }
 
     // Check if exists in Arena
+    var existsInArena = false;
     try {
       var arenaItem = client.getItemByNumber(itemNumber);
 
-      if (arenaItem) {
-        // Exists in Arena
-        existingRacks.push({
-          itemNumber: itemNumber,
-          name: rackConfig.metadata.itemName,
-          childCount: rackConfig.childCount
-        });
+      if (arenaItem && (arenaItem.guid || arenaItem.Guid)) {
+        // Exists in Arena (has valid GUID)
+        existsInArena = true;
+        Logger.log('✓ Rack ' + itemNumber + ' exists in Arena (GUID: ' + (arenaItem.guid || arenaItem.Guid) + ')');
       }
     } catch (error) {
+      // Error fetching = doesn't exist in Arena
+      Logger.log('✗ Rack ' + itemNumber + ' not found in Arena: ' + error.message);
+    }
+
+    if (existsInArena) {
+      existingRacks.push({
+        itemNumber: itemNumber,
+        name: rackConfig.metadata.itemName,
+        childCount: rackConfig.childCount
+      });
+    } else {
       // Doesn't exist in Arena - placeholder
+      Logger.log('→ Adding ' + itemNumber + ' to placeholder list');
       placeholderRacks.push({
         itemNumber: itemNumber,
         name: rackConfig.metadata.itemName || '',
