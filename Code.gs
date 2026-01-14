@@ -509,11 +509,31 @@ function showItemPicker() {
 
 /**
  * Shows the rack picker sidebar
+ * REFACTORED: Now uses dynamic terminology
  */
 function showRackPicker() {
+  var entitySingular = getTerminology('entity_singular');
   var html = HtmlService.createHtmlOutputFromFile('RackPicker')
-    .setTitle('Rack Picker');
+    .setTitle(entitySingular + ' Picker');
   SpreadsheetApp.getUi().showSidebar(html);
+}
+
+/**
+ * Gets terminology for client-side UI
+ * Called from HTML files to get dynamic terminology
+ * @return {Object} Terminology object with all keys
+ */
+function getTerminologyForUI() {
+  return {
+    entity_singular: getTerminology('entity_singular'),
+    entity_plural: getTerminology('entity_plural'),
+    entity_verb: getTerminology('entity_verb'),
+    entity_singular_lower: getTerminology('entity_singular_lower'),
+    entity_plural_lower: getTerminology('entity_plural_lower'),
+    hierarchy_level_0: getTerminology('hierarchy_level_0'),
+    hierarchy_level_1: getTerminology('hierarchy_level_1'),
+    hierarchy_level_2: getTerminology('hierarchy_level_2')
+  };
 }
 
 /**

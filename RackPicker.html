@@ -523,6 +523,14 @@
   </div>
 
   <script>
+    // DYNAMIC TERMINOLOGY: Loaded from server configuration
+    var terminology = {
+      entity_singular: 'Configuration',
+      entity_plural: 'Configurations',
+      entity_singular_lower: 'configuration',
+      entity_plural_lower: 'configurations'
+    };
+
     var allRacks = [];
     var selectedRack = null;
     var quantities = {};
@@ -537,11 +545,57 @@
     // Store arena items with GUID for linking
     var arenaItemsLookup = {};
 
+    // Load dynamic terminology from server configuration
+    google.script.run
+      .withSuccessHandler(function(terms) {
+        terminology = terms;
+        updateUIWithTerminology();
+      })
+      .withFailureHandler(function(error) {
+        console.log('Using default terminology:', error);
+        updateUIWithTerminology();
+      })
+      .getTerminologyForUI();
+
     // Load rack configurations when sidebar opens
     google.script.run
       .withSuccessHandler(displayRacks)
       .withFailureHandler(showError)
       .getAllRackConfigurationsForPicker();
+
+    /**
+     * Updates all UI text to use dynamic terminology
+     */
+    function updateUIWithTerminology() {
+      var entity = terminology.entity_singular;
+      var entities = terminology.entity_plural;
+      var entityLower = terminology.entity_singular_lower;
+      var entitiesLower = terminology.entity_plural_lower;
+
+      // Update header
+      document.querySelector('.header h2').textContent = entity + ' Picker';
+      document.querySelector('.header p').textContent = 'Select ' + entitiesLower + ' to place in overview';
+
+      // Update tab buttons
+      document.querySelector('.tab-button:nth-child(1)').innerHTML = '🗄️ ' + entities;
+
+      // Update tab headers
+      document.querySelector('.tab-header').innerHTML = '🗄️ Existing ' + entity + ' Configurations';
+
+      // Update search placeholder
+      document.getElementById('searchBox').placeholder = 'Search ' + entitiesLower + '...';
+
+      // Update button text
+      document.getElementById('insertButton').textContent = 'Place ' + entity + ' in Selected Cell';
+
+      // Update from Arena button
+      document.getElementById('arenaInsertButton').textContent = 'Place Item (Auto-Create ' + entity + ')';
+
+      // Update quantities tab
+      document.querySelector('.quantity-scope-label').textContent = 'Count ' + entities + ' From:';
+      var scopeButtons = document.querySelectorAll('.scope-btn');
+      scopeButtons[2].innerHTML = 'All ' + entities;
+    }
 
     function switchTab(tabName) {
       // Update tab buttons
@@ -572,13 +626,14 @@
       allRacks = racks;
 
       if (racks.length === 0) {
+        var entity = terminology.entity_singular_lower;
         document.getElementById('rackList').innerHTML = `
           <div class="empty-state">
             <div class="empty-state-icon">📦</div>
-            <div><strong>No rack configurations found</strong></div>
+            <div><strong>No ` + entity + ` configurations found</strong></div>
             <div style="margin-top: 8px; font-size: 12px;">
-              Create rack configurations using:<br>
-              Create Layout → New Rack Configuration
+              Create ` + entity + ` configurations using:<br>
+              Create Layout → New ` + terminology.entity_singular + ` Configuration
             </div>
           </div>
         `;
@@ -627,26 +682,27 @@
 
     function insertRack() {
       if (!selectedRack) {
-        alert('Please select a rack first');
+        alert('Please select a ' + terminology.entity_singular_lower + ' first');
         return;
       }
 
       // Disable button during insertion
       var button = document.getElementById('insertButton');
+      var entity = terminology.entity_singular;
       button.disabled = true;
-      button.textContent = 'Placing rack...';
+      button.textContent = 'Placing ' + terminology.entity_singular_lower + '...';
 
       google.script.run
         .withSuccessHandler(function() {
-          button.textContent = 'Place Rack in Selected Cell';
+          button.textContent = 'Place ' + entity + ' in Selected Cell';
           button.disabled = false;
 
           // Show success feedback
-          showToast('Rack placed successfully!');
+          showToast(entity + ' placed successfully!');
         })
         .withFailureHandler(function(error) {
-          alert('Error placing rack: ' + error.message);
-          button.textContent = 'Place Rack in Selected Cell';
+          alert('Error placing ' + terminology.entity_singular_lower + ': ' + error.message);
+          button.textContent = 'Place ' + entity + ' in Selected Cell';
           button.disabled = false;
         })
         .insertSelectedRack(selectedRack);
@@ -670,10 +726,11 @@
     }
 
     function showError(error) {
+      var entities = terminology.entity_plural_lower;
       document.getElementById('rackList').innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">⚠️</div>
-          <div><strong>Error loading racks</strong></div>
+          <div><strong>Error loading ` + entities + `</strong></div>
           <div style="margin-top: 8px; font-size: 12px; color: #d93025;">
             ${error.message}
           </div>
@@ -900,12 +957,15 @@
 
       // Disable button during insertion
       var button = document.getElementById('arenaInsertButton');
+      var entity = terminology.entity_singular;
+      var entityLower = terminology.entity_singular_lower;
+      var entitiesLower = terminology.entity_plural_lower;
       button.disabled = true;
-      button.textContent = 'Creating rack & pulling BOM...';
+      button.textContent = 'Creating ' + entityLower + ' & pulling BOM...';
 
       google.script.run
         .withSuccessHandler(function() {
-          button.textContent = 'Place Item (Auto-Create Rack)';
+          button.textContent = 'Place Item (Auto-Create ' + entity + ')';
           button.disabled = false;
 
           // Reload rack list and update the UI
@@ -914,17 +974,17 @@
               allRacks = racks;
               // Update the visual display in the Racks tab
               renderRacks(racks);
-              console.log('✅ Rack list refreshed - ' + racks.length + ' racks available');
+              console.log('✅ ' + entity + ' list refreshed - ' + racks.length + ' ' + entitiesLower + ' available');
 
-              // Show success feedback with rack count
-              var rackName = selectedArenaItem.number || selectedArenaItem.name;
-              showToast('✅ Rack "' + rackName + '" created!\n📦 ' + racks.length + ' rack(s) available in Racks tab');
+              // Show success feedback with count
+              var itemName = selectedArenaItem.number || selectedArenaItem.name;
+              showToast('✅ ' + entity + ' "' + itemName + '" created!\n📦 ' + racks.length + ' ' + entitiesLower + ' available');
             })
             .getAllRackConfigurationsForPicker();
         })
         .withFailureHandler(function(error) {
           alert('Error placing item: ' + error.message);
-          button.textContent = 'Place Item (Auto-Create Rack)';
+          button.textContent = 'Place Item (Auto-Create ' + entity + ')';
           button.disabled = false;
         })
         .insertSelectedRack(selectedArenaItem);
@@ -947,7 +1007,7 @@
       var scopeNames = {
         'current': 'Current Sheet',
         'overview': 'Overview Only',
-        'racks': 'All Rack Configurations',
+        'racks': 'All ' + terminology.entity_singular + ' Configurations',
         'all': 'All Sheets'
       };
       document.getElementById('scopeName').textContent = scopeNames[scope];
@@ -970,7 +1030,7 @@
           console.error('Error loading quantities:', error);
           document.getElementById('quantitiesLoading').classList.add('hidden');
           document.getElementById('quantityListContainer').innerHTML =
-            '<div class="empty-state"><p>Error loading rack usage</p></div>';
+            '<div class="empty-state"><p>Error loading ' + terminology.entity_singular_lower + ' usage</p></div>';
         })
         .getRackQuantitiesWithScope(currentScope);
     }
@@ -982,7 +1042,7 @@
       var rackNumbers = Object.keys(quantities);
 
       if (rackNumbers.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No racks found in selected scope</p></div>';
+        container.innerHTML = '<div class="empty-state"><p>No ' + terminology.entity_plural_lower + ' found in selected scope</p></div>';
         document.getElementById('uniqueCount').textContent = '0';
         document.getElementById('totalQuantity').textContent = '0';
         return;
