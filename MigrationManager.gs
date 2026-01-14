@@ -296,16 +296,19 @@ function showExportDialog() {
   }
 
   // Create HTML output to display JSON
+  // SECURITY FIX: Use JavaScript to set textarea value to prevent XSS
   var html = HtmlService.createHtmlOutput(
     '<h3>Configuration Export</h3>' +
     '<p>Copy the JSON below to back up your configuration:</p>' +
-    '<textarea id="configJson" style="width:100%; height:400px; font-family:monospace; font-size:12px;">' +
-    exportResult.json +
-    '</textarea>' +
+    '<textarea id="configJson" style="width:100%; height:400px; font-family:monospace; font-size:12px;"></textarea>' +
     '<br><br>' +
     '<button onclick="selectAll()">Select All</button>' +
     '<button onclick="google.script.host.close()">Close</button>' +
     '<script>' +
+    '(function() {' +
+    '  var jsonData = ' + JSON.stringify(exportResult.json) + ';' +
+    '  document.getElementById("configJson").value = jsonData;' +
+    '})();' +
     'function selectAll() {' +
     '  document.getElementById("configJson").select();' +
     '  document.execCommand("copy");' +

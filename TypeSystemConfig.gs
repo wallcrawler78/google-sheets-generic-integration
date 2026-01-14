@@ -437,15 +437,28 @@ function getDatacenterHierarchyLevels() {
 function validateTypeSystemConfiguration(config) {
   var errors = [];
 
+  // SECURITY: Define maximum limits to prevent quota exhaustion
+  var MAX_STRING_LENGTH = 200;
+  var MAX_KEYWORDS_PER_TYPE = 50;
+  var MAX_TYPES = 50;
+  var MAX_CATEGORIES = 50;
+
   // Validate primary entity
   if (!config.primaryEntity) {
     errors.push('Primary entity configuration is required');
   } else {
     if (!config.primaryEntity.singular || config.primaryEntity.singular.trim() === '') {
       errors.push('Primary entity singular name is required');
+    } else if (config.primaryEntity.singular.length > MAX_STRING_LENGTH) {
+      errors.push('Primary entity singular name too long (max ' + MAX_STRING_LENGTH + ' characters)');
     }
     if (!config.primaryEntity.plural || config.primaryEntity.plural.trim() === '') {
       errors.push('Primary entity plural name is required');
+    } else if (config.primaryEntity.plural.length > MAX_STRING_LENGTH) {
+      errors.push('Primary entity plural name too long (max ' + MAX_STRING_LENGTH + ' characters)');
+    }
+    if (config.primaryEntity.verb && config.primaryEntity.verb.length > MAX_STRING_LENGTH) {
+      errors.push('Primary entity verb too long (max ' + MAX_STRING_LENGTH + ' characters)');
     }
   }
 
@@ -453,16 +466,88 @@ function validateTypeSystemConfiguration(config) {
   if (!config.typeDefinitions || config.typeDefinitions.length === 0) {
     errors.push('At least one type definition is required');
   } else {
+    // SECURITY: Check maximum number of type definitions
+    if (config.typeDefinitions.length > MAX_TYPES) {
+      errors.push('Too many type definitions (max ' + MAX_TYPES + ')');
+    }
+
     for (var i = 0; i < config.typeDefinitions.length; i++) {
       var typeDef = config.typeDefinitions[i];
       if (!typeDef.id || typeDef.id.trim() === '') {
         errors.push('Type definition #' + (i + 1) + ' missing ID');
+      } else if (typeDef.id.length > MAX_STRING_LENGTH) {
+        errors.push('Type definition #' + (i + 1) + ' ID too long (max ' + MAX_STRING_LENGTH + ' characters)');
       }
       if (!typeDef.name || typeDef.name.trim() === '') {
         errors.push('Type definition #' + (i + 1) + ' missing name');
+      } else if (typeDef.name.length > MAX_STRING_LENGTH) {
+        errors.push('Type definition #' + (i + 1) + ' name too long (max ' + MAX_STRING_LENGTH + ' characters)');
+      }
+      if (typeDef.displayName && typeDef.displayName.length > MAX_STRING_LENGTH) {
+        errors.push('Type definition #' + (i + 1) + ' display name too long (max ' + MAX_STRING_LENGTH + ' characters)');
       }
       if (!typeDef.keywords || typeDef.keywords.length === 0) {
         errors.push('Type definition #' + (i + 1) + ' must have at least one keyword');
+      } else if (typeDef.keywords.length > MAX_KEYWORDS_PER_TYPE) {
+        errors.push('Type definition #' + (i + 1) + ' has too many keywords (max ' + MAX_KEYWORDS_PER_TYPE + ')');
+      } else {
+        // Validate each keyword length
+        for (var k = 0; k < typeDef.keywords.length; k++) {
+          if (typeDef.keywords[k] && typeDef.keywords[k].length > MAX_STRING_LENGTH) {
+            errors.push('Type definition #' + (i + 1) + ' keyword #' + (k + 1) + ' too long (max ' + MAX_STRING_LENGTH + ' characters)');
+          }
+        }
+      }
+      // Validate color format (SECURITY FIX: Prevent invalid colors)
+      if (typeDef.color) {
+        if (!typeDef.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+          errors.push('Type definition #' + (i + 1) + ' has invalid color format. Must be 6-digit hex (e.g., #00FFFF)');
+        }
+      } else {
+        errors.push('Type definition #' + (i + 1) + ' missing color');
+      }
+    }
+  }
+
+  // Validate category classifications
+  if (config.categoryClassifications && config.categoryClassifications.length > 0) {
+    // SECURITY: Check maximum number of categories
+    if (config.categoryClassifications.length > MAX_CATEGORIES) {
+      errors.push('Too many category classifications (max ' + MAX_CATEGORIES + ')');
+    }
+
+    for (var j = 0; j < config.categoryClassifications.length; j++) {
+      var catClass = config.categoryClassifications[j];
+
+      if (!catClass.id || catClass.id.trim() === '') {
+        errors.push('Category classification #' + (j + 1) + ' missing ID');
+      } else if (catClass.id.length > MAX_STRING_LENGTH) {
+        errors.push('Category classification #' + (j + 1) + ' ID too long (max ' + MAX_STRING_LENGTH + ' characters)');
+      }
+      if (!catClass.name || catClass.name.trim() === '') {
+        errors.push('Category classification #' + (j + 1) + ' missing name');
+      } else if (catClass.name.length > MAX_STRING_LENGTH) {
+        errors.push('Category classification #' + (j + 1) + ' name too long (max ' + MAX_STRING_LENGTH + ' characters)');
+      }
+      if (!catClass.keywords || catClass.keywords.length === 0) {
+        errors.push('Category classification #' + (j + 1) + ' must have at least one keyword');
+      } else if (catClass.keywords.length > MAX_KEYWORDS_PER_TYPE) {
+        errors.push('Category classification #' + (j + 1) + ' has too many keywords (max ' + MAX_KEYWORDS_PER_TYPE + ')');
+      } else {
+        // Validate each keyword length
+        for (var c = 0; c < catClass.keywords.length; c++) {
+          if (catClass.keywords[c] && catClass.keywords[c].length > MAX_STRING_LENGTH) {
+            errors.push('Category classification #' + (j + 1) + ' keyword #' + (c + 1) + ' too long (max ' + MAX_STRING_LENGTH + ' characters)');
+          }
+        }
+      }
+      // Validate color format (SECURITY FIX: Prevent invalid colors)
+      if (catClass.color) {
+        if (!catClass.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+          errors.push('Category classification #' + (j + 1) + ' has invalid color format. Must be 6-digit hex (e.g., #FFFF00)');
+        }
+      } else {
+        errors.push('Category classification #' + (j + 1) + ' missing color');
       }
     }
   }
@@ -474,6 +559,25 @@ function validateTypeSystemConfiguration(config) {
     }
     if (config.layoutConfig.positionsPerRow && config.layoutConfig.positionsPerRow < 1) {
       errors.push('Layout must have at least 1 position per row');
+    }
+    if (config.layoutConfig.labelPrefix && config.layoutConfig.labelPrefix.length > MAX_STRING_LENGTH) {
+      errors.push('Layout label prefix too long (max ' + MAX_STRING_LENGTH + ' characters)');
+    }
+    if (config.layoutConfig.gridType && config.layoutConfig.gridType.length > MAX_STRING_LENGTH) {
+      errors.push('Layout grid type too long (max ' + MAX_STRING_LENGTH + ' characters)');
+    }
+  }
+
+  // Validate hierarchy levels
+  if (config.hierarchyLevels && config.hierarchyLevels.length > 0) {
+    for (var h = 0; h < config.hierarchyLevels.length; h++) {
+      var level = config.hierarchyLevels[h];
+      if (level.name && level.name.length > MAX_STRING_LENGTH) {
+        errors.push('Hierarchy level #' + (h + 1) + ' name too long (max ' + MAX_STRING_LENGTH + ' characters)');
+      }
+      if (level.attribute && level.attribute.length > MAX_STRING_LENGTH) {
+        errors.push('Hierarchy level #' + (h + 1) + ' attribute too long (max ' + MAX_STRING_LENGTH + ' characters)');
+      }
     }
   }
 
