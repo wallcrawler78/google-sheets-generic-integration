@@ -1,6 +1,7 @@
 /**
- * PTC Arena Sheets Data Center
+ * PTC Arena Sheets Generic Integration
  * Main entry point for Google Sheets Add-on
+ * REFACTORED: Now supports user-configurable terminology via TypeSystemConfig.gs
  */
 
 /**
@@ -12,25 +13,64 @@ function onInstall(e) {
 
 /**
  * Runs when the spreadsheet is opened
+ * REFACTORED: Adds first-run detection and auto-migration
  */
 function onOpen(e) {
   var ui = SpreadsheetApp.getUi();
-  ui.createMenu('Arena Data Center')
+
+  // Check for first run and handle initialization
+  var firstRunCheck = checkFirstRun();
+
+  if (firstRunCheck.action === 'auto-migrate') {
+    // Silently auto-migrate datacenter configuration
+    Logger.log('Auto-migrating datacenter configuration...');
+    var migrationResult = autoMigrateIfNeeded();
+
+    if (migrationResult.performed && migrationResult.success) {
+      Logger.log('Auto-migration successful');
+
+      // Show one-time notification if needed
+      if (shouldShowMigrationNotification()) {
+        showMigrationNotification();
+      }
+    }
+  } else if (firstRunCheck.action === 'show-wizard') {
+    // First run - show setup wizard after menu is created
+    // Use a time-delayed trigger to show wizard after menu loads
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Welcome! Please complete the setup wizard to configure your integration.',
+      'First Time Setup',
+      -1
+    );
+
+    // Show wizard after a short delay
+    Utilities.sleep(500);
+    showSetupWizard();
+    return; // Exit early - wizard will reload when complete
+  }
+
+  // Get dynamic terminology for menu labels
+  var entitySingular = getTerminology('entity_singular');
+  var entityPlural = getTerminology('entity_plural');
+  var level0Name = getTerminology('hierarchy_level_0');
+
+  // Create menu with dynamic terminology
+  ui.createMenu('Arena ' + level0Name)
     .addSubMenu(ui.createMenu('Create Layout')
-      .addItem('New Rack Configuration', 'createNewRackConfiguration')
+      .addItem('New ' + entitySingular + ' Configuration', 'createNewRackConfiguration')
       .addItem('New Overview Layout', 'createNewOverviewLayout')
-      .addItem('Autolink Racks to Overview', 'autoLinkRacksToOverviewAction'))
+      .addItem('Autolink ' + entityPlural + ' to Overview', 'autoLinkRacksToOverviewAction'))
     .addSeparator()
     .addItem('Show Item Picker', 'showItemPicker')
-    .addItem('Show Rack Picker', 'showRackPicker')
+    .addItem('Show ' + entitySingular + ' Picker', 'showRackPicker')
     .addSeparator()
     .addSubMenu(ui.createMenu('BOM Operations')
       .addItem('Create Consolidated BOM', 'createConsolidatedBOMSheet')
-      .addItem('Push POD Structure to Arena (NEW)', 'pushPODStructureToArenaNew')
-      .addItem('Push POD Structure to Arena (OLD)', 'pushPODStructureToArena')
+      .addItem('Push ' + level0Name + ' Structure to Arena (NEW)', 'pushPODStructureToArenaNew')
+      .addItem('Push ' + level0Name + ' Structure to Arena (OLD)', 'pushPODStructureToArena')
       .addSeparator()
-      .addItem('Check all Rack Status (vs. PDM)', 'checkAllRackStatuses')
-      .addItem('View Rack History', 'viewRackHistory'))
+      .addItem('Check all ' + entitySingular + ' Status (vs. PDM)', 'checkAllRackStatuses')
+      .addItem('View ' + entitySingular + ' History', 'viewRackHistory'))
     .addSeparator()
     .addSubMenu(ui.createMenu('Setup')
       .addSubMenu(ui.createMenu('Configuration')
@@ -38,15 +78,22 @@ function onOpen(e) {
         .addItem('Test Connection', 'testArenaConnection')
         .addItem('Clear Credentials', 'clearCredentials')
         .addSeparator()
+        .addItem('Configure Type System', 'showConfigureTypeSystem')
+        .addItem('Run Setup Wizard', 'showSetupWizard')
+        .addSeparator()
         .addItem('Configure Item Columns', 'showConfigureColumns')
         .addItem('Configure Category Colors', 'showConfigureColors')
-        .addItem('Configure Rack Colors', 'showConfigureRackColors')
+        .addItem('Configure ' + entitySingular + ' Colors', 'showConfigureRackColors')
         .addItem('Configure BOM Levels', 'showConfigureBOMLevels')
-        .addItem('Rack Location Propagation', 'showRackBOMLocationSetting'))
+        .addItem(entitySingular + ' Location Propagation', 'showRackBOMLocationSetting'))
       .addSubMenu(ui.createMenu('Advanced')
-        .addItem('Mark Current Rack as Synced', 'markCurrentRackAsSynced')
+        .addItem('Mark Current ' + entitySingular + ' as Synced', 'markCurrentRackAsSynced')
         .addItem('Validate History Integrity', 'validateHistoryTabIntegrity')
-        .addItem('Repair History Issues', 'repairHistoryTabIntegrity')))
+        .addItem('Repair History Issues', 'repairHistoryTabIntegrity')
+        .addSeparator()
+        .addItem('Export Configuration', 'showExportDialog')
+        .addItem('Import Configuration', 'showImportDialog')
+        .addItem('Reset Configuration', 'resetConfigurationDialog')))
     .addSeparator()
     .addItem('Help and Documentation', 'showHelp')
     .addToUi();
@@ -1928,4 +1975,67 @@ function clearSidebarCache() {
   cache.remove('history_sidebar_shown');
   Logger.log('Sidebar cache cleared - auto-open will work again');
   SpreadsheetApp.getUi().alert('Cache Cleared', 'Sidebar will auto-open next time you visit Rack History tab.', SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+// ============================================================================
+// TYPE SYSTEM CONFIGURATION FUNCTIONS (NEW)
+// ============================================================================
+
+/**
+ * Shows the type system configuration UI
+ * NEW: Allows users to configure entity types, categories, and terminology
+ */
+function showConfigureTypeSystem() {
+  // TODO: Create ConfigureTypeSystem.html
+  // For now, show a placeholder message
+  var ui = SpreadsheetApp.getUi();
+  ui.alert(
+    'Type System Configuration',
+    'Type system configuration UI coming soon!\n\n' +
+    'For now, you can:\n' +
+    '• Run the Setup Wizard to reconfigure\n' +
+    '• Export/Import your configuration\n' +
+    '• Use the migration functions',
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Shows a dialog to reset the configuration system
+ * NEW: Allows users to start fresh with default configuration
+ */
+function resetConfigurationDialog() {
+  var ui = SpreadsheetApp.getUi();
+
+  var response = ui.alert(
+    'Reset Configuration',
+    'This will reset your type system configuration to defaults.\n\n' +
+    '⚠️ WARNING: This will erase your custom:\n' +
+    '• Entity type names and keywords\n' +
+    '• Category classifications\n' +
+    '• Layout settings\n' +
+    '• Hierarchy levels\n\n' +
+    'Your sheets and data will NOT be affected.\n\n' +
+    'Continue with reset?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response === ui.Button.YES) {
+    var result = resetTypeSystemConfiguration();
+
+    if (result.success) {
+      ui.alert(
+        'Configuration Reset',
+        'Type system configuration has been reset.\n\n' +
+        'Please reload the spreadsheet to run the setup wizard again.',
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert(
+        'Reset Failed',
+        'Could not reset configuration: ' + result.message,
+        ui.ButtonSet.OK
+      );
+    }
+  }
 }

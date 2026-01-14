@@ -1,9 +1,13 @@
 /**
- * Configuration Constants for PTC Arena Sheets Data Center
+ * Configuration Constants for PTC Arena Sheets Generic Integration
  * Centralized configuration for sheet structure, colors, and mappings
+ *
+ * NOTE: Many configuration values are now dynamically loaded from TypeSystemConfig.gs
+ * This provides user-configurable terminology and classifications.
  */
 
-// Sheet/Tab Names
+// DEPRECATED: Legacy sheet names for backward compatibility
+// New installations use dynamic configuration from TypeSystemConfig.gs
 var SHEET_NAMES = {
   LEGEND_NET: 'Legend-NET',
   OVERHEAD: 'Overhead',
@@ -32,7 +36,8 @@ var RACK_COLUMN_INDICES = {
   ITEM_CATEGORY: 3 // Column D
 };
 
-// Color schemes for different rack types (RGB format for Google Sheets)
+// DEPRECATED: Legacy color schemes for backward compatibility
+// New installations use dynamic configuration from TypeSystemConfig.gs
 var RACK_COLORS = {
   FULL_RACK_A: '#00FFFF',    // Cyan
   FULL_RACK_B: '#FFA500',    // Orange
@@ -46,7 +51,8 @@ var RACK_COLORS = {
   GRID_POD: '#00FF00'        // Green
 };
 
-// Category definitions for Legend-NET
+// DEPRECATED: Legacy category definitions for backward compatibility
+// New installations use dynamic configuration from TypeSystemConfig.gs
 var LEGEND_CATEGORIES = {
   ETH: {
     name: 'Data center ETH',
@@ -78,8 +84,9 @@ var ARENA_FIELD_MAPPING = {
   LIFECYCLE: 'lifecyclePhase'  // Lifecycle status
 };
 
-// Rack type classification
-// Used to determine which rack tab an item belongs to
+// DEPRECATED: Legacy rack type and category keywords for backward compatibility
+// New installations use dynamic configuration from TypeSystemConfig.gs
+// These are kept only for reference and migration purposes
 var RACK_TYPE_KEYWORDS = {
   FULL_RACK_A: ['rack a', 'type a', 'config a'],
   FULL_RACK_B: ['rack b', 'type b', 'config b'],
@@ -90,7 +97,6 @@ var RACK_TYPE_KEYWORDS = {
   FULL_RACK_G: ['rack g', 'type g', 'config g']
 };
 
-// Category classification keywords
 var CATEGORY_KEYWORDS = {
   ETH: ['ethernet', 'eth', 'network switch', 'nic'],
   SPINE: ['spine', 'backbone', 'core switch'],
@@ -141,17 +147,29 @@ var OVERHEAD_CONFIG = {
 };
 
 /**
- * Gets the color for a given rack type
- * @param {string} rackType - The rack type name
+ * Gets the color for a given entity/rack type
+ * Now uses dynamic configuration from TypeSystemConfig.gs
+ * @param {string} entityType - The entity type name
  * @return {string} Color hex code
  */
-function getRackColor(rackType) {
-  var normalizedType = rackType.toUpperCase().replace(/\s+/g, '_');
+function getRackColor(entityType) {
+  // Try to get color from dynamic configuration
+  var typeDefinitions = getTypeDefinitions();
+  for (var i = 0; i < typeDefinitions.length; i++) {
+    var typeDef = typeDefinitions[i];
+    if (typeDef.name === entityType || typeDef.displayName === entityType) {
+      return typeDef.color;
+    }
+  }
+
+  // Fallback to legacy hardcoded colors for backward compatibility
+  var normalizedType = entityType.toUpperCase().replace(/\s+/g, '_');
   return RACK_COLORS[normalizedType] || '#CCCCCC'; // Default to gray
 }
 
 /**
  * Gets the category for an item based on keywords
+ * REFACTORED: Now uses dynamic configuration from TypeSystemConfig.gs
  * @param {string} itemName - The item name or description
  * @param {string} itemCategory - The Arena category field
  * @return {string} Matched category
@@ -159,12 +177,29 @@ function getRackColor(rackType) {
 function getCategoryFromItem(itemName, itemCategory) {
   var searchText = (itemName + ' ' + itemCategory).toLowerCase();
 
-  // Check each category's keywords
-  for (var category in CATEGORY_KEYWORDS) {
-    var keywords = CATEGORY_KEYWORDS[category];
-    for (var i = 0; i < keywords.length; i++) {
-      if (searchText.indexOf(keywords[i].toLowerCase()) !== -1) {
-        return category.replace('_', ' '); // Return formatted category name
+  // Use dynamic category classifications
+  var categoryClassifications = getCategoryClassifications();
+
+  for (var i = 0; i < categoryClassifications.length; i++) {
+    var catClass = categoryClassifications[i];
+    if (!catClass.enabled) continue;
+
+    var keywords = catClass.keywords;
+    for (var j = 0; j < keywords.length; j++) {
+      if (searchText.indexOf(keywords[j].toLowerCase()) !== -1) {
+        return catClass.name;
+      }
+    }
+  }
+
+  // If no category classifications configured, fall back to legacy
+  if (categoryClassifications.length === 0) {
+    for (var category in CATEGORY_KEYWORDS) {
+      var legacyKeywords = CATEGORY_KEYWORDS[category];
+      for (var k = 0; k < legacyKeywords.length; k++) {
+        if (searchText.indexOf(legacyKeywords[k].toLowerCase()) !== -1) {
+          return category.replace('_', ' ');
+        }
       }
     }
   }
@@ -173,11 +208,12 @@ function getCategoryFromItem(itemName, itemCategory) {
 }
 
 /**
- * Determines which rack tab an item belongs to
+ * Determines which entity type tab an item belongs to
+ * REFACTORED: Now uses dynamic configuration from TypeSystemConfig.gs
  * @param {Object} arenaItem - The Arena API item object
- * @return {string} The rack tab name, or null if no match
+ * @return {string} The entity type tab name, or null if no match
  */
-function determineRackType(arenaItem) {
+function determineEntityType(arenaItem) {
   var searchText = '';
 
   // Build search text from various fields
@@ -185,31 +221,56 @@ function determineRackType(arenaItem) {
   if (arenaItem.category) searchText += arenaItem.category.toLowerCase() + ' ';
   if (arenaItem.description) searchText += arenaItem.description.toLowerCase() + ' ';
 
-  // Check against rack type keywords
-  for (var rackType in RACK_TYPE_KEYWORDS) {
-    var keywords = RACK_TYPE_KEYWORDS[rackType];
-    for (var i = 0; i < keywords.length; i++) {
-      if (searchText.indexOf(keywords[i]) !== -1) {
-        return SHEET_NAMES[rackType];
+  // Use dynamic type definitions
+  var typeDefinitions = getTypeDefinitions();
+
+  for (var i = 0; i < typeDefinitions.length; i++) {
+    var typeDef = typeDefinitions[i];
+    if (!typeDef.enabled) continue;
+
+    var keywords = typeDef.keywords;
+    for (var j = 0; j < keywords.length; j++) {
+      if (searchText.indexOf(keywords[j].toLowerCase()) !== -1) {
+        return typeDef.name; // Return the user-defined type name
       }
     }
   }
 
-  return null; // No rack type match found
+  return null; // No entity type match found
 }
 
 /**
- * Gets all rack tab names as an array
- * @return {Array<string>} Array of rack tab names
+ * @deprecated Use determineEntityType() instead
+ * Kept for backward compatibility with existing code
+ */
+function determineRackType(arenaItem) {
+  Logger.log('DEPRECATED: determineRackType() called. Use determineEntityType() instead.');
+  return determineEntityType(arenaItem);
+}
+
+/**
+ * Gets all entity type tab names as an array
+ * REFACTORED: Now uses dynamic configuration from TypeSystemConfig.gs
+ * @return {Array<string>} Array of entity tab names
+ */
+function getAllEntityTabNames() {
+  var typeDefinitions = getTypeDefinitions();
+  var tabNames = [];
+
+  for (var i = 0; i < typeDefinitions.length; i++) {
+    if (typeDefinitions[i].enabled) {
+      tabNames.push(typeDefinitions[i].name);
+    }
+  }
+
+  return tabNames;
+}
+
+/**
+ * @deprecated Use getAllEntityTabNames() instead
+ * Kept for backward compatibility with existing code
  */
 function getAllRackTabNames() {
-  return [
-    SHEET_NAMES.FULL_RACK_A,
-    SHEET_NAMES.FULL_RACK_B,
-    SHEET_NAMES.FULL_RACK_C,
-    SHEET_NAMES.FULL_RACK_D,
-    SHEET_NAMES.FULL_RACK_E,
-    SHEET_NAMES.FULL_RACK_F,
-    SHEET_NAMES.FULL_RACK_G
-  ];
+  Logger.log('DEPRECATED: getAllRackTabNames() called. Use getAllEntityTabNames() instead.');
+  return getAllEntityTabNames();
 }
