@@ -1,7 +1,22 @@
 /**
  * BOM Builder
  * Handles building, pushing, and pulling Bills of Materials between Google Sheets and Arena
+ *
+ * NOTE: This file contains many hardcoded "POD", "Row", "Rack" references that should be
+ * replaced with dynamic hierarchy level names for full generic support. Current implementation
+ * works for migrated datacenter users but needs additional refactoring for complete customization.
  */
+
+// Helper function to get dynamic hierarchy level name
+function _getBOMHierarchyName(level) {
+  try {
+    return getHierarchyLevelName(level);
+  } catch (e) {
+    // Fallback to defaults if configuration not loaded
+    var fallbacks = ['POD', 'Row', 'Rack'];
+    return fallbacks[level] || 'Level ' + level;
+  }
+}
 
 /**
  * Pulls a BOM from Arena and populates the current sheet
