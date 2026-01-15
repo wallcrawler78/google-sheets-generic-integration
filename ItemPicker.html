@@ -537,8 +537,8 @@
             <button class="scope-btn" data-scope="overview" onclick="changeScope('overview')">
               Overview Only
             </button>
-            <button class="scope-btn" data-scope="racks" onclick="changeScope('racks')">
-              All Racks
+            <button class="scope-btn" data-scope="racks" onclick="changeScope('racks')" id="scopeRacksBtn">
+              All Configurations
             </button>
             <button class="scope-btn" data-scope="all" onclick="changeScope('all')">
               All Sheets
@@ -580,6 +580,14 @@
   </div>
 
   <script>
+    // DYNAMIC TERMINOLOGY: Loaded from server configuration
+    var terminology = {
+      entity_singular: 'Configuration',
+      entity_plural: 'Configurations',
+      entity_singular_lower: 'configuration',
+      entity_plural_lower: 'configurations'
+    };
+
     var allItems = [];
     var categories = [];
     var categoryColors = {};
@@ -596,8 +604,33 @@
     var displayedCount = 0;
     var isLoadingMore = false;
 
+    // Load dynamic terminology from server configuration
+    google.script.run
+      .withSuccessHandler(function(terms) {
+        terminology = terms;
+        updateUIWithTerminology();
+      })
+      .withFailureHandler(function(error) {
+        console.log('Using default terminology:', error);
+        updateUIWithTerminology();
+      })
+      .getTerminologyForUI();
+
     // Load initial data
     loadItemsData();
+
+    /**
+     * Updates UI text to use dynamic terminology
+     */
+    function updateUIWithTerminology() {
+      var entities = terminology.entity_plural;
+
+      // Update scope button
+      var scopeBtn = document.getElementById('scopeRacksBtn');
+      if (scopeBtn) {
+        scopeBtn.innerHTML = 'All ' + entities;
+      }
+    }
 
     // Set up scroll-based auto-loading
     document.addEventListener('DOMContentLoaded', function() {
@@ -1095,7 +1128,7 @@
       var scopeNames = {
         'current': 'Current Sheet',
         'overview': 'Overview Only',
-        'racks': 'All Rack Configurations',
+        'racks': 'All ' + terminology.entity_singular + ' Configurations',
         'all': 'All Sheets'
       };
       document.getElementById('scopeName').textContent = scopeNames[scope];

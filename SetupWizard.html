@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Google Sans', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .wizard-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 700px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .wizard-header {
+      background: linear-gradient(135deg, #1a73e8 0%, #174ea6 100%);
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .wizard-header h1 {
+      font-size: 24px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .wizard-header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .wizard-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px;
+    }
+
+    .wizard-step {
+      display: none;
+    }
+
+    .wizard-step.active {
+      display: block;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-title {
+      font-size: 20px;
+      font-weight: 500;
+      color: #1a73e8;
+      margin-bottom: 8px;
+    }
+
+    .step-description {
+      font-size: 14px;
+      color: #5f6368;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .form-hint {
+      display: block;
+      font-size: 12px;
+      color: #5f6368;
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #dadce0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #1a73e8;
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+    }
+
+    .example-box {
+      background: #e8f0fe;
+      border-left: 3px solid #1a73e8;
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #174ea6;
+    }
+
+    .example-box strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .preset-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .preset-btn {
+      padding: 12px;
+      border: 2px solid #dadce0;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .preset-btn:hover {
+      border-color: #1a73e8;
+      background: #f8f9fa;
+    }
+
+    .preset-btn.selected {
+      border-color: #1a73e8;
+      background: #e8f0fe;
+      color: #1a73e8;
+      font-weight: 500;
+    }
+
+    .wizard-footer {
+      border-top: 1px solid #e0e0e0;
+      padding: 20px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f9f9f9;
+    }
+
+    .step-indicator {
+      font-size: 12px;
+      color: #5f6368;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #5f6368;
+      border: 2px solid #dadce0;
+    }
+
+    .btn-secondary:hover {
+      background: #f8f9fa;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #1a73e8 0%, #174ea6 100%);
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      background: #dadce0;
+      color: #9aa0a6;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .spinner {
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top: 4px solid white;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .summary-card {
+      background: #f8f9fa;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .summary-card h4 {
+      font-size: 14px;
+      color: #1a73e8;
+      margin-bottom: 8px;
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .summary-label {
+      color: #5f6368;
+    }
+
+    .summary-value {
+      font-weight: 500;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="wizard-container">
+    <div class="wizard-header">
+      <h1>Setup Your Integration</h1>
+      <p>Configure terminology and settings to match your use case</p>
+    </div>
+
+    <div class="wizard-body">
+      <!-- Step 1: Use Case Selection -->
+      <div class="wizard-step active" id="step1">
+        <div class="step-title">What are you managing?</div>
+        <div class="step-description">
+          Choose a preset or customize your own terminology. This determines what the items are called throughout the interface.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Choose a preset or customize:</label>
+          <div class="preset-buttons">
+            <div class="preset-btn" onclick="selectPreset('datacenter')">
+              <div style="font-size: 20px; margin-bottom: 4px;">🖥️</div>
+              <div>Data Center</div>
+              <div style="font-size: 11px; color: #666;">Racks & PODs</div>
+            </div>
+            <div class="preset-btn" onclick="selectPreset('manufacturing')">
+              <div style="font-size: 20px; margin-bottom: 4px;">🏭</div>
+              <div>Manufacturing</div>
+              <div style="font-size: 11px; color: #666;">Assemblies</div>
+            </div>
+            <div class="preset-btn" onclick="selectPreset('warehouse')">
+              <div style="font-size: 20px; margin-bottom: 4px;">📦</div>
+              <div>Warehouse</div>
+              <div style="font-size: 11px; color: #666;">Shelving Units</div>
+            </div>
+            <div class="preset-btn selected" onclick="selectPreset('generic')">
+              <div style="font-size: 20px; margin-bottom: 4px;">⚙️</div>
+              <div>Custom</div>
+              <div style="font-size: 11px; color: #666;">Your terms</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="example-box">
+          <strong>Examples of use cases:</strong>
+          • Data centers (racks in PODs)<br>
+          • Food processing (equipment assemblies)<br>
+          • Product manufacturing (configurations)<br>
+          • IT infrastructure (server clusters)<br>
+          • Warehouse management (shelving systems)
+        </div>
+      </div>
+
+      <!-- Step 2: Primary Entity Configuration -->
+      <div class="wizard-step" id="step2">
+        <div class="step-title">Primary Entity Name</div>
+        <div class="step-description">
+          What do you call the main item you're configuring? This appears throughout the interface.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Singular Name</label>
+          <span class="form-hint">What you call one item (e.g., "Rack", "Assembly", "Server")</span>
+          <input type="text" id="entitySingular" class="form-input" placeholder="Configuration" value="Configuration">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Plural Name</label>
+          <span class="form-hint">What you call multiple items (e.g., "Racks", "Assemblies", "Servers")</span>
+          <input type="text" id="entityPlural" class="form-input" placeholder="Configurations" value="Configurations">
+        </div>
+
+        <div class="example-box">
+          <strong>This affects:</strong>
+          Menu: "Show {Singular} Picker"<br>
+          Button: "Place {Singular} in Selected Cell"<br>
+          Tab: "{Plural}"
+        </div>
+      </div>
+
+      <!-- Step 3: Hierarchy Configuration -->
+      <div class="wizard-step" id="step3">
+        <div class="step-title">Hierarchy Levels</div>
+        <div class="step-description">
+          Define the levels of your organizational structure, from largest to smallest.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Level 0 - Top Level (e.g., Building, Facility)</label>
+          <span class="form-hint">The highest level grouping</span>
+          <input type="text" id="level0Name" class="form-input" placeholder="Assembly" value="Assembly">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Level 1 - Mid Level (e.g., Floor, Zone)</label>
+          <span class="form-hint">The middle level grouping</span>
+          <input type="text" id="level1Name" class="form-input" placeholder="SubAssembly" value="SubAssembly">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Level 2 - Item Level</label>
+          <span class="form-hint">Your primary entity (will use the singular name from Step 2)</span>
+          <input type="text" id="level2Name" class="form-input" placeholder="Configuration" value="Configuration" readonly>
+        </div>
+
+        <div class="example-box">
+          <strong>Datacenter example:</strong>
+          Level 0: POD → Level 1: Row → Level 2: Rack<br>
+          <strong>Manufacturing example:</strong>
+          Level 0: Production Line → Level 1: Station → Level 2: Assembly
+        </div>
+      </div>
+
+      <!-- Step 4: Review & Confirm -->
+      <div class="wizard-step" id="step4">
+        <div class="step-title">Review Your Configuration</div>
+        <div class="step-description">
+          Confirm your settings below. You can change these later via Setup → Configure Type System.
+        </div>
+
+        <div class="summary-card">
+          <h4>Primary Entity</h4>
+          <div class="summary-item">
+            <span class="summary-label">Singular:</span>
+            <span class="summary-value" id="reviewSingular">Configuration</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Plural:</span>
+            <span class="summary-value" id="reviewPlural">Configurations</span>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <h4>Hierarchy Structure</h4>
+          <div class="summary-item">
+            <span class="summary-label">Level 0 (Top):</span>
+            <span class="summary-value" id="reviewLevel0">Assembly</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Level 1 (Mid):</span>
+            <span class="summary-value" id="reviewLevel1">SubAssembly</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Level 2 (Item):</span>
+            <span class="summary-value" id="reviewLevel2">Configuration</span>
+          </div>
+        </div>
+
+        <div class="example-box">
+          <strong>How it will appear:</strong>
+          Menu: "Arena <span id="previewLevel0">Assembly</span>" → "Show <span id="previewSingular">Configuration</span> Picker"<br>
+          Button: "Place <span id="previewSingular2">Configuration</span> in Selected Cell"<br>
+          Picker: "<span id="previewSingular3">Configuration</span> Picker" with "<span id="previewPlural">Configurations</span>" tab
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <div class="step-indicator">
+        <span id="stepNumber">Step 1 of 4</span>
+      </div>
+      <div class="button-group">
+        <button class="btn btn-secondary" id="backBtn" onclick="previousStep()" style="display:none;">Back</button>
+        <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">Next</button>
+        <button class="btn btn-primary" id="finishBtn" onclick="finish()" style="display:none;">Complete Setup</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div style="text-align: center;">
+      <div class="spinner"></div>
+      <div style="color: white; margin-top: 16px; font-size: 14px;">Saving configuration...</div>
+    </div>
+  </div>
+
+  <script>
+    var currentStep = 1;
+    var totalSteps = 4;
+    var selectedPreset = 'generic';
+
+    var presets = {
+      datacenter: {
+        entitySingular: 'Rack',
+        entityPlural: 'Racks',
+        level0: 'POD',
+        level1: 'Row',
+        level2: 'Rack'
+      },
+      manufacturing: {
+        entitySingular: 'Assembly',
+        entityPlural: 'Assemblies',
+        level0: 'Production Line',
+        level1: 'Station',
+        level2: 'Assembly'
+      },
+      warehouse: {
+        entitySingular: 'Shelf Unit',
+        entityPlural: 'Shelf Units',
+        level0: 'Warehouse',
+        level1: 'Aisle',
+        level2: 'Shelf Unit'
+      },
+      generic: {
+        entitySingular: 'Configuration',
+        entityPlural: 'Configurations',
+        level0: 'Assembly',
+        level1: 'SubAssembly',
+        level2: 'Configuration'
+      }
+    };
+
+    function selectPreset(preset) {
+      selectedPreset = preset;
+
+      // Update UI
+      var buttons = document.querySelectorAll('.preset-btn');
+      buttons.forEach(function(btn) {
+        btn.classList.remove('selected');
+      });
+      event.currentTarget.classList.add('selected');
+
+      // Apply preset values
+      var presetData = presets[preset];
+      document.getElementById('entitySingular').value = presetData.entitySingular;
+      document.getElementById('entityPlural').value = presetData.entityPlural;
+      document.getElementById('level0Name').value = presetData.level0;
+      document.getElementById('level1Name').value = presetData.level1;
+      document.getElementById('level2Name').value = presetData.level2;
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) {
+        // Sync level2 with singular name
+        if (currentStep === 2) {
+          document.getElementById('level2Name').value = document.getElementById('entitySingular').value;
+        }
+
+        // Update review on step 4
+        if (currentStep === 3) {
+          updateReview();
+        }
+
+        currentStep++;
+        updateStepDisplay();
+      }
+    }
+
+    function previousStep() {
+      if (currentStep > 1) {
+        currentStep--;
+        updateStepDisplay();
+      }
+    }
+
+    function updateStepDisplay() {
+      // Hide all steps
+      var steps = document.querySelectorAll('.wizard-step');
+      steps.forEach(function(step) {
+        step.classList.remove('active');
+      });
+
+      // Show current step
+      document.getElementById('step' + currentStep).classList.add('active');
+
+      // Update footer
+      document.getElementById('stepNumber').textContent = 'Step ' + currentStep + ' of ' + totalSteps;
+
+      // Show/hide buttons
+      document.getElementById('backBtn').style.display = currentStep > 1 ? 'block' : 'none';
+      document.getElementById('nextBtn').style.display = currentStep < totalSteps ? 'block' : 'none';
+      document.getElementById('finishBtn').style.display = currentStep === totalSteps ? 'block' : 'none';
+    }
+
+    function updateReview() {
+      var singular = document.getElementById('entitySingular').value;
+      var plural = document.getElementById('entityPlural').value;
+      var level0 = document.getElementById('level0Name').value;
+      var level1 = document.getElementById('level1Name').value;
+
+      document.getElementById('reviewSingular').textContent = singular;
+      document.getElementById('reviewPlural').textContent = plural;
+      document.getElementById('reviewLevel0').textContent = level0;
+      document.getElementById('reviewLevel1').textContent = level1;
+      document.getElementById('reviewLevel2').textContent = singular;
+
+      document.getElementById('previewLevel0').textContent = level0;
+      document.getElementById('previewSingular').textContent = singular;
+      document.getElementById('previewSingular2').textContent = singular;
+      document.getElementById('previewSingular3').textContent = singular;
+      document.getElementById('previewPlural').textContent = plural;
+    }
+
+    function finish() {
+      // Gather configuration
+      var config = {
+        primaryEntity: {
+          singular: document.getElementById('entitySingular').value,
+          plural: document.getElementById('entityPlural').value,
+          verb: document.getElementById('entitySingular').value
+        },
+        typeDefinitions: [
+          {
+            id: 'TYPE_1',
+            name: 'Standard ' + document.getElementById('entitySingular').value,
+            displayName: 'Type A',
+            keywords: ['standard', 'type a', 'type 1'],
+            color: '#00FFFF',
+            enabled: true
+          },
+          {
+            id: 'TYPE_2',
+            name: 'Advanced ' + document.getElementById('entitySingular').value,
+            displayName: 'Type B',
+            keywords: ['advanced', 'type b', 'type 2'],
+            color: '#FFA500',
+            enabled: true
+          },
+          {
+            id: 'TYPE_3',
+            name: 'Premium ' + document.getElementById('entitySingular').value,
+            displayName: 'Type C',
+            keywords: ['premium', 'type c', 'type 3'],
+            color: '#00FF00',
+            enabled: true
+          }
+        ],
+        categoryClassifications: [],
+        layoutConfig: {
+          gridType: 'OVERHEAD',
+          rows: 4,
+          positionsPerRow: 10,
+          labelPrefix: 'Pos',
+          cellHeight: 25,
+          cellWidth: 120
+        },
+        hierarchyLevels: [
+          {
+            level: 0,
+            name: document.getElementById('level0Name').value,
+            attribute: null
+          },
+          {
+            level: 1,
+            name: document.getElementById('level1Name').value,
+            attribute: null
+          },
+          {
+            level: 2,
+            name: document.getElementById('entitySingular').value,
+            attribute: null
+          }
+        ]
+      };
+
+      // Show loading
+      document.getElementById('loadingOverlay').classList.add('active');
+
+      // Save configuration
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            alert('Setup complete! Your integration is now configured.\n\nPlease reload the spreadsheet to see your custom terminology in action.');
+            google.script.host.close();
+          } else {
+            document.getElementById('loadingOverlay').classList.remove('active');
+            alert('Setup failed: ' + result.message);
+          }
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('loadingOverlay').classList.remove('active');
+          alert('Error during setup: ' + error.message);
+        })
+        .saveSetupWizardConfig(config);
+    }
+
+    // Sync level2 with entitySingular
+    document.getElementById('entitySingular').addEventListener('input', function() {
+      document.getElementById('level2Name').value = this.value;
+    });
+  </script>
+</body>
+</html>

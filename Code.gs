@@ -35,19 +35,17 @@ function onOpen(e) {
       }
     }
   } else if (firstRunCheck.action === 'show-wizard') {
-    // TEMPORARY FIX: Skip wizard until SetupWizard.html is created (Phase 4)
-    // For now, just show a toast and continue to create menus
+    // First run - show setup wizard to configure terminology
     SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Setup wizard not yet available. Using default configuration for now.\n' +
-      'To configure, use Setup → Quick Setup or manually migrate with Setup → Run Migration.',
+      'Welcome! Please complete the setup wizard to configure your integration.',
       'First Time Setup',
-      10
+      5
     );
 
-    // Use default neutral configuration silently
-    Logger.log('First run detected - using default configuration');
-    // Don't call showSetupWizard() since HTML doesn't exist yet
-    // Continue to create menus below
+    // Show wizard after a short delay to let menu load
+    Utilities.sleep(500);
+    showSetupWizard();
+    return; // Exit early - wizard will trigger reload when complete
   }
 
   // Get dynamic terminology for menu labels
